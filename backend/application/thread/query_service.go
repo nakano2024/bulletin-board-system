@@ -8,6 +8,7 @@ import (
 type ThreadListItem struct {
 	ID        string
 	Body      string
+	ImagePath *string
 	CreatedAt time.Time
 }
 

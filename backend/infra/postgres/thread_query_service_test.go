@@ -18,12 +18,14 @@ import (
 type seedThread struct {
 	id        string
 	body      string
+	imagePath *string
 	createdAt time.Time
 }
 
 func TestPostgresThreadQueryService_FetchThreadList_正常系(t *testing.T) {
 	pool := newTestPool(t)
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	imagePath := "images/thread-1.png"
 
 	tests := []struct {
 		name string
@@ -31,23 +33,23 @@ func TestPostgresThreadQueryService_FetchThreadList_正常系(t *testing.T) {
 		want []applicationthread.ThreadListItem
 	}{
 		{
-			name: "スレッドが1件登録されているとき、そのスレッドのID/Body/CreatedAtを保持した要素が1件返ること",
+			name: "スレッドが1件登録されているとき、そのスレッドのID/Body/ImagePath/CreatedAtを保持した要素が1件返ること",
 			seed: []seedThread{
-				{id: "thread-1", body: "hello", createdAt: fixedTime},
+				{id: "thread-1", body: "hello", imagePath: &imagePath, createdAt: fixedTime},
 			},
 			want: []applicationthread.ThreadListItem{
-				{ID: "thread-1", Body: "hello", CreatedAt: fixedTime},
+				{ID: "thread-1", Body: "hello", ImagePath: &imagePath, CreatedAt: fixedTime},
 			},
 		},
 		{
-			name: "スレッドが複数件登録されているとき、登録件数と同じ件数の要素が返ること",
+			name: "スレッドが複数件登録されているとき、登録件数と同じ件数の要素(image_pathがnullの要素含む)が返ること",
 			seed: []seedThread{
-				{id: "thread-1", body: "first", createdAt: fixedTime},
-				{id: "thread-2", body: "second", createdAt: fixedTime.Add(time.Minute)},
+				{id: "thread-1", body: "first", imagePath: nil, createdAt: fixedTime},
+				{id: "thread-2", body: "second", imagePath: &imagePath, createdAt: fixedTime.Add(time.Minute)},
 			},
 			want: []applicationthread.ThreadListItem{
-				{ID: "thread-1", Body: "first", CreatedAt: fixedTime},
-				{ID: "thread-2", Body: "second", CreatedAt: fixedTime.Add(time.Minute)},
+				{ID: "thread-1", Body: "first", ImagePath: nil, CreatedAt: fixedTime},
+				{ID: "thread-2", Body: "second", ImagePath: &imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 			},
 		},
 		{
@@ -66,7 +68,7 @@ func TestPostgresThreadQueryService_FetchThreadList_正常系(t *testing.T) {
 			t.Cleanup(func() { tx.Rollback(ctx) })
 
 			for _, s := range tt.seed {
-				_, err := tx.Exec(ctx, "INSERT INTO threads (id, body, created_at) VALUES ($1, $2, $3)", s.id, s.body, s.createdAt)
+				_, err := tx.Exec(ctx, "INSERT INTO threads (id, body, image_path, created_at) VALUES ($1, $2, $3, $4)", s.id, s.body, s.imagePath, s.createdAt)
 				require.NoError(t, err)
 			}
 
@@ -85,6 +87,7 @@ func normalizeThreadListItems(items []applicationthread.ThreadListItem) []applic
 		normalized[i] = applicationthread.ThreadListItem{
 			ID:        item.ID,
 			Body:      item.Body,
+			ImagePath: item.ImagePath,
 			CreatedAt: item.CreatedAt.UTC(),
 		}
 	}

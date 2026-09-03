@@ -16,6 +16,7 @@ import (
 
 func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	imagePath := "images/thread-1.png"
 
 	tests := []struct {
 		name      string
@@ -23,15 +24,15 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 		want      *thread.ListThreadsOutput
 	}{
 		{
-			name: "QueryServiceが1件のスレッドを返すとき、Outputの要素にID/Body/CreatedAtが正しく変換されて含まれること",
+			name: "QueryServiceが1件のスレッドを返すとき、Outputの要素にID/Body/ImagePath/CreatedAtが正しく変換されて含まれること",
 			setupMock: func(m *mock_thread.MockIThreadQueryService) {
 				m.EXPECT().FetchThreadList(gomock.Any()).Return([]thread.ThreadListItem{
-					{ID: "thread-1", Body: "hello", CreatedAt: fixedTime},
+					{ID: "thread-1", Body: "hello", ImagePath: &imagePath, CreatedAt: fixedTime},
 				}, nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{
-					{ID: "thread-1", Body: "hello", CreatedAt: fixedTime},
+					{ID: "thread-1", Body: "hello", ImagePath: &imagePath, CreatedAt: fixedTime},
 				},
 			},
 		},
@@ -39,14 +40,14 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 			name: "QueryServiceが複数件のスレッドを返すとき、Outputの件数・順序がQueryServiceの返却順と一致すること",
 			setupMock: func(m *mock_thread.MockIThreadQueryService) {
 				m.EXPECT().FetchThreadList(gomock.Any()).Return([]thread.ThreadListItem{
-					{ID: "thread-1", Body: "first", CreatedAt: fixedTime},
-					{ID: "thread-2", Body: "second", CreatedAt: fixedTime.Add(time.Minute)},
+					{ID: "thread-1", Body: "first", ImagePath: nil, CreatedAt: fixedTime},
+					{ID: "thread-2", Body: "second", ImagePath: &imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 				}, nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{
-					{ID: "thread-1", Body: "first", CreatedAt: fixedTime},
-					{ID: "thread-2", Body: "second", CreatedAt: fixedTime.Add(time.Minute)},
+					{ID: "thread-1", Body: "first", ImagePath: nil, CreatedAt: fixedTime},
+					{ID: "thread-2", Body: "second", ImagePath: &imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 				},
 			},
 		},

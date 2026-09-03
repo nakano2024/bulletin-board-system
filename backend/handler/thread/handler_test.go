@@ -19,6 +19,7 @@ import (
 
 func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	imagePath := "images/thread-1.png"
 
 	tests := []struct {
 		name       string
@@ -27,29 +28,29 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 		wantBody   string
 	}{
 		{
-			name: "Usecaseが1件のOutputを返すとき、ステータス200かつレスポンスボディが1件の要素を含むこと",
+			name: "Usecaseが1件のOutputを返すとき、ステータス200かつレスポンスボディが1件の要素(image_path含む)を含むこと",
 			setupMock: func(m *mock_thread.MocklistThreadsUsecase) {
 				m.EXPECT().Exec(gomock.Any(), applicationthread.ListThreadsCommand{}).Return(&applicationthread.ListThreadsOutput{
 					Threads: []applicationthread.ListThreadsOutputThread{
-						{ID: "thread-1", Body: "hello", CreatedAt: fixedTime},
+						{ID: "thread-1", Body: "hello", ImagePath: &imagePath, CreatedAt: fixedTime},
 					},
 				}, nil)
 			},
 			wantStatus: http.StatusOK,
-			wantBody:   `{"threads":[{"id":"thread-1","body":"hello","created_at":"2026-09-03T12:00:00Z"}]}` + "\n",
+			wantBody:   `{"threads":[{"id":"thread-1","body":"hello","image_path":"images/thread-1.png","created_at":"2026-09-03T12:00:00Z"}]}` + "\n",
 		},
 		{
-			name: "Usecaseが複数件のOutputを返すとき、ステータス200かつレスポンスボディが各要素を含むこと",
+			name: "Usecaseが複数件のOutputを返すとき、ステータス200かつレスポンスボディが各要素(image_pathがnullの要素含む)を含むこと",
 			setupMock: func(m *mock_thread.MocklistThreadsUsecase) {
 				m.EXPECT().Exec(gomock.Any(), applicationthread.ListThreadsCommand{}).Return(&applicationthread.ListThreadsOutput{
 					Threads: []applicationthread.ListThreadsOutputThread{
-						{ID: "thread-1", Body: "first", CreatedAt: fixedTime},
-						{ID: "thread-2", Body: "second", CreatedAt: fixedTime.Add(time.Minute)},
+						{ID: "thread-1", Body: "first", ImagePath: nil, CreatedAt: fixedTime},
+						{ID: "thread-2", Body: "second", ImagePath: &imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 					},
 				}, nil)
 			},
 			wantStatus: http.StatusOK,
-			wantBody:   `{"threads":[{"id":"thread-1","body":"first","created_at":"2026-09-03T12:00:00Z"},{"id":"thread-2","body":"second","created_at":"2026-09-03T12:01:00Z"}]}` + "\n",
+			wantBody:   `{"threads":[{"id":"thread-1","body":"first","image_path":null,"created_at":"2026-09-03T12:00:00Z"},{"id":"thread-2","body":"second","image_path":"images/thread-1.png","created_at":"2026-09-03T12:01:00Z"}]}` + "\n",
 		},
 		{
 			name: "Usecaseが空のOutputを返すとき、ステータス200かつレスポンスボディが空配列であること",

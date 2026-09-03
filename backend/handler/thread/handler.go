@@ -13,6 +13,7 @@ import (
 type ThreadResponse struct {
 	ID        string    `json:"id"`
 	Body      string    `json:"body"`
+	ImagePath *string   `json:"image_path"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -45,7 +46,7 @@ func (h *ThreadHandler) ListThreads(c echo.Context) error {
 func toThreadResponses(threads []applicationthread.ListThreadsOutputThread) []ThreadResponse {
 	responses := make([]ThreadResponse, 0, len(threads))
 	for _, t := range threads {
-		responses = append(responses, ThreadResponse{ID: t.ID, Body: t.Body, CreatedAt: t.CreatedAt})
+		responses = append(responses, ThreadResponse{ID: t.ID, Body: t.Body, ImagePath: t.ImagePath, CreatedAt: t.CreatedAt})
 	}
 	return responses
 }

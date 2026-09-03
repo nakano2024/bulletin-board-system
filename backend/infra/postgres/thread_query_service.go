@@ -23,7 +23,7 @@ func NewPostgresThreadQueryService(db querier) *PostgresThreadQueryService {
 }
 
 func (s *PostgresThreadQueryService) FetchThreadList(ctx context.Context) ([]applicationthread.ThreadListItem, error) {
-	rows, err := s.db.Query(ctx, "SELECT id, body, created_at FROM threads ORDER BY created_at ASC")
+	rows, err := s.db.Query(ctx, "SELECT id, body, image_path, created_at FROM threads ORDER BY created_at ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (s *PostgresThreadQueryService) FetchThreadList(ctx context.Context) ([]app
 	items := make([]applicationthread.ThreadListItem, 0)
 	for rows.Next() {
 		var item applicationthread.ThreadListItem
-		if err := rows.Scan(&item.ID, &item.Body, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Body, &item.ImagePath, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

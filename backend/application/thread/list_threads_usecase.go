@@ -10,6 +10,7 @@ type ListThreadsCommand struct{}
 type ListThreadsOutputThread struct {
 	ID        string
 	Body      string
+	ImagePath *string
 	CreatedAt time.Time
 }
 
@@ -46,6 +47,7 @@ func toListThreadsOutputThread(item ThreadListItem) ListThreadsOutputThread {
 	return ListThreadsOutputThread{
 		ID:        item.ID,
 		Body:      item.Body,
+		ImagePath: item.ImagePath,
 		CreatedAt: item.CreatedAt,
 	}
 }
