@@ -75,6 +75,7 @@ func (u *CreateThreadUsecase) Exec(ctx context.Context, cmd CreateThreadCommand)
 - **ドメインモデル型をフィールドに持たない。** プリミティブ型と DTO のみで構成する軽量データモデルとする。
 - 振る舞い（業務ロジック）を持たせない。ドメインモデルからの変換関数は持ってよい。
 - ドメインモデル → `XxOutput` の変換は application 層で行う。handler にドメインモデルを渡さない。
+- **`XxOutput` は、`IRepository` / `IQueryService` が返す型（ドメインモデル、`IQueryService` の DTO）をそのまま使い回さない。** フィールド構成が同じであっても、`XxOutput` 専用の型を別途定義し、`Exec()` の中で変換する。これにより、`IQueryService` 側の戻り値の型を変更しても `XxOutput` の型定義に直接波及しない。
 - **`XxCommand` は、Web 層の型（`http.Header`、`*http.Request`、`echo.Context` など）をそのままプロパティに持たない。** ビジネスロジックが必要とする値だけを、handler 側でプリミティブ型に変換してから詰める。「念のため渡しておく」形で Web 層の値をまるごと持たせない。
 - `XxCommand` のプロパティは、そのユースケースのビジネスロジックが実際に使う必要最小限の値に絞る。使うかどうか分からない値を先回りして持たせない。
 
@@ -275,7 +276,7 @@ func (h *ThreadHandler) GetThread(c echo.Context) error {
 2. そのロジックはアプリケーション固有か汎用か → 固有なら `domain/`、汎用なら `application/`
 3. ドメインモデルのメソッドとして表現できるか → できないなら DomainService
 4. 追加したリポジトリメソッドは、業務上の意味を名前で表現できているか
-5. `XxOutput` にドメインモデル型が混ざっていないか
+5. `XxOutput` にドメインモデル型や `IQueryService` の DTO 型がそのまま混ざっていないか（`XxOutput` 専用の型に変換しているか）
 6. `infra/` の実装に業務判断の分岐が入っていないか
 7. `domain/` の import に、他レイヤーや外部ライブラリが混ざっていないか
 8. 追加したエンドポイントのパスは REST の原則（複数形リソース名、ネストは親パスにぶら下げる）に沿っているか

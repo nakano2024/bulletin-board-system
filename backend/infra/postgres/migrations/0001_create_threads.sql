@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS threads (
+    id TEXT PRIMARY KEY,
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL
+);
