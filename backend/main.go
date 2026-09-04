@@ -10,6 +10,7 @@ import (
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
+	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"
 )
 
@@ -21,8 +22,9 @@ func main() {
 		panic(err)
 	}
 
-	threadQueryService := postgres.NewPostgresThreadQueryService(pool)
-	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadQueryService)
+	threadRepository := postgres.NewPostgresThreadRepository(pool, os.Getenv("THREAD_IMAGE_BASE_PATH"))
+	logger := infralog.NewStdLogger()
+	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadRepository, logger)
 	threadHandler := thread.NewThreadHandler(listThreadsUsecase)
 
 	e := echo.New()

@@ -13,7 +13,7 @@ import (
 type ThreadResponse struct {
 	ID        string    `json:"id"`
 	Body      string    `json:"body"`
-	ImagePath *string   `json:"image_path"`
+	ImagePath string    `json:"image_path"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -37,6 +37,7 @@ func NewThreadHandler(listThreadsUsecase listThreadsUsecase) *ThreadHandler {
 func (h *ThreadHandler) ListThreads(c echo.Context) error {
 	output, err := h.listThreadsUsecase.Exec(c.Request().Context(), applicationthread.ListThreadsCommand{})
 	if err != nil {
+		c.Logger().Error(err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "スレッド一覧の取得に失敗しました。"})
 	}
 

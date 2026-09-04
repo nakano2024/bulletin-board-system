@@ -126,4 +126,4 @@ func TestCreateThreadUsecase_Exec_正常系(t *testing.T) {
 
 - echo の `e.NewContext(req, rec)` で `echo.Context` を組み立て、ハンドラのメソッドを直接呼び出す（`httptest.NewRequest` / `httptest.NewRecorder` を使う）。ルーティング設定（`main.go` の `e.GET` など）自体はテスト対象に含めない。
 - Usecase は gomock でモックする。モックかスタブかは「モックの使い方」の基準で決める。
-- 検証観点は「HTTPステータスコード」「レスポンスボディ（JSON）」の2点に絞る。
+- 検証観点は基本的に「HTTPステータスコード」「レスポンスボディ（JSON）」の2点に絞る。ハンドラが明示的にログ出力を行う場合（例: エラー詳細を`c.Logger()`でログにのみ残すなど）は、そのログ内容も検証対象に含めてよい。`e.Logger.SetOutput(&buf)`でロガーの出力先を`bytes.Buffer`等に差し替え、`assert.Contains`等でログに含まれるべき内容を確認する。

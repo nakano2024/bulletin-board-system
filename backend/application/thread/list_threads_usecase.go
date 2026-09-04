@@ -3,6 +3,8 @@ package thread
 import (
 	"context"
 	"time"
+
+	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
 type ListThreadsCommand struct{}
@@ -10,7 +12,7 @@ type ListThreadsCommand struct{}
 type ListThreadsOutputThread struct {
 	ID        string
 	Body      string
-	ImagePath *string
+	ImagePath string
 	CreatedAt time.Time
 }
 
@@ -19,35 +21,37 @@ type ListThreadsOutput struct {
 }
 
 type ListThreadsUsecase struct {
-	queryService IThreadQueryService
+	threadRepository domainthread.IThreadRepository
+	logger           ILogger
 }
 
-func NewListThreadsUsecase(queryService IThreadQueryService) *ListThreadsUsecase {
-	return &ListThreadsUsecase{queryService: queryService}
+func NewListThreadsUsecase(threadRepository domainthread.IThreadRepository, logger ILogger) *ListThreadsUsecase {
+	return &ListThreadsUsecase{threadRepository: threadRepository, logger: logger}
 }
 
 func (u *ListThreadsUsecase) Exec(ctx context.Context, cmd ListThreadsCommand) (*ListThreadsOutput, error) {
-	items, err := u.queryService.FetchThreadList(ctx)
+	threadList, err := u.threadRepository.FetchActiveThreadList(ctx)
 	if err != nil {
+		u.logger.Error(ctx, err)
 		return nil, err
 	}
 
-	return &ListThreadsOutput{Threads: toListThreadsOutputThreads(items)}, nil
+	return &ListThreadsOutput{Threads: toListThreadsOutputThreads(threadList.Threads())}, nil
 }
 
-func toListThreadsOutputThreads(items []ThreadListItem) []ListThreadsOutputThread {
-	threads := make([]ListThreadsOutputThread, 0, len(items))
-	for _, item := range items {
-		threads = append(threads, toListThreadsOutputThread(item))
+func toListThreadsOutputThreads(threads []*domainthread.Thread) []ListThreadsOutputThread {
+	outputs := make([]ListThreadsOutputThread, 0, len(threads))
+	for _, t := range threads {
+		outputs = append(outputs, toListThreadsOutputThread(t))
 	}
-	return threads
+	return outputs
 }
 
-func toListThreadsOutputThread(item ThreadListItem) ListThreadsOutputThread {
+func toListThreadsOutputThread(t *domainthread.Thread) ListThreadsOutputThread {
 	return ListThreadsOutputThread{
-		ID:        item.ID,
-		Body:      item.Body,
-		ImagePath: item.ImagePath,
-		CreatedAt: item.CreatedAt,
+		ID:        t.ID(),
+		Body:      t.Body(),
+		ImagePath: t.FilePathValue(),
+		CreatedAt: t.CreatedAt(),
 	}
 }

@@ -1,6 +1,7 @@
 package thread_test
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 			setupMock: func(m *mock_thread.MocklistThreadsUsecase) {
 				m.EXPECT().Exec(gomock.Any(), applicationthread.ListThreadsCommand{}).Return(&applicationthread.ListThreadsOutput{
 					Threads: []applicationthread.ListThreadsOutputThread{
-						{ID: "thread-1", Body: "hello", ImagePath: &imagePath, CreatedAt: fixedTime},
+						{ID: "thread-1", Body: "hello", ImagePath: imagePath, CreatedAt: fixedTime},
 					},
 				}, nil)
 			},
@@ -40,17 +41,17 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 			wantBody:   `{"threads":[{"id":"thread-1","body":"hello","image_path":"images/thread-1.png","created_at":"2026-09-03T12:00:00Z"}]}` + "\n",
 		},
 		{
-			name: "Usecaseが複数件のOutputを返すとき、ステータス200かつレスポンスボディが各要素(image_pathがnullの要素含む)を含むこと",
+			name: "Usecaseが複数件のOutputを返すとき、ステータス200かつレスポンスボディが各要素(image_pathが空文字の要素含む)を含むこと",
 			setupMock: func(m *mock_thread.MocklistThreadsUsecase) {
 				m.EXPECT().Exec(gomock.Any(), applicationthread.ListThreadsCommand{}).Return(&applicationthread.ListThreadsOutput{
 					Threads: []applicationthread.ListThreadsOutputThread{
-						{ID: "thread-1", Body: "first", ImagePath: nil, CreatedAt: fixedTime},
-						{ID: "thread-2", Body: "second", ImagePath: &imagePath, CreatedAt: fixedTime.Add(time.Minute)},
+						{ID: "thread-1", Body: "first", ImagePath: "", CreatedAt: fixedTime},
+						{ID: "thread-2", Body: "second", ImagePath: imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 					},
 				}, nil)
 			},
 			wantStatus: http.StatusOK,
-			wantBody:   `{"threads":[{"id":"thread-1","body":"first","image_path":null,"created_at":"2026-09-03T12:00:00Z"},{"id":"thread-2","body":"second","image_path":"images/thread-1.png","created_at":"2026-09-03T12:01:00Z"}]}` + "\n",
+			wantBody:   `{"threads":[{"id":"thread-1","body":"first","image_path":"","created_at":"2026-09-03T12:00:00Z"},{"id":"thread-2","body":"second","image_path":"images/thread-1.png","created_at":"2026-09-03T12:01:00Z"}]}` + "\n",
 		},
 		{
 			name: "Usecaseが空のOutputを返すとき、ステータス200かつレスポンスボディが空配列であること",
@@ -87,18 +88,20 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 
 func TestThreadHandler_ListThreads_異常系(t *testing.T) {
 	tests := []struct {
-		name       string
-		setupMock  func(*mock_thread.MocklistThreadsUsecase)
-		wantStatus int
-		wantBody   string
+		name          string
+		setupMock     func(*mock_thread.MocklistThreadsUsecase)
+		wantStatus    int
+		wantBody      string
+		wantLogSubstr string
 	}{
 		{
-			name: "Usecaseがエラーを返すとき、ステータス500かつ固定メッセージを含むレスポンスが返ること",
+			name: "Usecaseがエラーを返すとき、ステータス500かつ固定メッセージを含むレスポンスが返り、エラー詳細がログに出力されること",
 			setupMock: func(m *mock_thread.MocklistThreadsUsecase) {
 				m.EXPECT().Exec(gomock.Any(), applicationthread.ListThreadsCommand{}).Return(nil, errors.New("query failed"))
 			},
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   `{"message":"スレッド一覧の取得に失敗しました。"}` + "\n",
+			wantStatus:    http.StatusInternalServerError,
+			wantBody:      `{"message":"スレッド一覧の取得に失敗しました。"}` + "\n",
+			wantLogSubstr: "query failed",
 		},
 	}
 
@@ -108,7 +111,9 @@ func TestThreadHandler_ListThreads_異常系(t *testing.T) {
 			usecase := mock_thread.NewMocklistThreadsUsecase(ctrl)
 			tt.setupMock(usecase)
 
+			var logBuf bytes.Buffer
 			e := echo.New()
+			e.Logger.SetOutput(&logBuf)
 			req := httptest.NewRequest(http.MethodGet, "/threads", nil)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
@@ -119,6 +124,7 @@ func TestThreadHandler_ListThreads_異常系(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			assert.Equal(t, tt.wantBody, rec.Body.String())
+			assert.Contains(t, logBuf.String(), tt.wantLogSubstr)
 		})
 	}
 }

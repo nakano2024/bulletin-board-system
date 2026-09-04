@@ -9,6 +9,7 @@ services:
       - ./backend:/app
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/bulletin_board?sslmode=disable
+      THREAD_IMAGE_BASE_PATH: thread_images/
       REDIS_ADDR: redis:6379
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustfsadmin
