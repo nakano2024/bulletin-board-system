@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrThreadIDEmpty       = errors.New("thread id is empty")
-	ErrThreadBodyEmpty     = errors.New("thread body is empty")
-	ErrThreadCreatedAtZero = errors.New("thread created at is zero")
+	ErrThreadIDEmpty         = errors.New("thread id is empty")
+	ErrThreadBodyEmpty       = errors.New("thread body is empty")
+	ErrThreadCreatedAtZero   = errors.New("thread created at is zero")
+	ErrThreadFilePathMissing = errors.New("thread file path is missing")
 )
 
 type Thread struct {
@@ -18,7 +19,7 @@ type Thread struct {
 	createdAt time.Time
 }
 
-// NewThread reconstructs a Thread, validating its invariants. filePath may be nil (no image attached).
+// NewThread reconstructs a Thread, validating its invariants. filePath must not be nil — image attachment is mandatory.
 func NewThread(id, body string, filePath *FilePath, createdAt time.Time) (*Thread, error) {
 	if id == "" {
 		return nil, ErrThreadIDEmpty
@@ -28,6 +29,9 @@ func NewThread(id, body string, filePath *FilePath, createdAt time.Time) (*Threa
 	}
 	if createdAt.IsZero() {
 		return nil, ErrThreadCreatedAtZero
+	}
+	if filePath == nil {
+		return nil, ErrThreadFilePathMissing
 	}
 
 	return &Thread{id: id, body: body, filePath: filePath, createdAt: createdAt}, nil
@@ -45,11 +49,8 @@ func (t *Thread) FilePath() *FilePath {
 	return t.filePath
 }
 
-// FilePathValue returns the file path as a plain string, or "" when no image is attached.
+// FilePathValue returns the file path as a plain string.
 func (t *Thread) FilePathValue() string {
-	if t.filePath == nil {
-		return ""
-	}
 	return t.filePath.Value()
 }
 

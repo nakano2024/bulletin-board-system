@@ -12,7 +12,9 @@ import (
 
 func TestNewThreadList(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	th, err := thread.NewThread("thread-1", "hello", nil, fixedTime)
+	filePath, err := thread.NewFilePath("images/", "sample123")
+	require.NoError(t, err)
+	th, err := thread.NewThread("thread-1", "hello", filePath, fixedTime)
 	require.NoError(t, err)
 
 	tests := []struct {

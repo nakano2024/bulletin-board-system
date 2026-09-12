@@ -24,7 +24,7 @@ func TestNewThread_正常系(t *testing.T) {
 		wantFilePathValue string
 	}{
 		{
-			name:              "id・body・createdAt・filePath(画像あり)が全て正常な値のとき、Threadが生成されること",
+			name:              "id・body・createdAt・filePathが全て正常な値のとき、Threadが生成されること",
 			id:                "thread-1",
 			body:              "hello",
 			filePath:          filePath,
@@ -32,20 +32,12 @@ func TestNewThread_正常系(t *testing.T) {
 			wantFilePathValue: "images/sample123",
 		},
 		{
-			name:              "filePathがnil(画像未添付)のとき、Threadが生成されること",
-			id:                "thread-1",
-			body:              "hello",
-			filePath:          nil,
-			createdAt:         fixedTime,
-			wantFilePathValue: "",
-		},
-		{
 			name:              "bodyが1文字のとき、Threadが生成されること",
 			id:                "thread-1",
 			body:              "a",
-			filePath:          nil,
+			filePath:          filePath,
 			createdAt:         fixedTime,
-			wantFilePathValue: "",
+			wantFilePathValue: "images/sample123",
 		},
 	}
 
@@ -93,6 +85,13 @@ func TestNewThread_異常系(t *testing.T) {
 			body:      "hello",
 			createdAt: time.Time{},
 			wantErr:   thread.ErrThreadCreatedAtZero,
+		},
+		{
+			name:      "filePathがnilのとき、ErrThreadFilePathMissingが返ること",
+			id:        "thread-1",
+			body:      "hello",
+			createdAt: fixedTime,
+			wantErr:   thread.ErrThreadFilePathMissing,
 		},
 	}
 
