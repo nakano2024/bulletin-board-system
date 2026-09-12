@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	handlerthread "github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"

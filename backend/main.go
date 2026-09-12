@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"

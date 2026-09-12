@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/nakanokota/bulletin-board-system/backend/application/thread"
-	"github.com/nakanokota/bulletin-board-system/backend/application/thread/mock_thread"
+	"github.com/nakanokota/bulletin-board-system/backend/application/mock/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 

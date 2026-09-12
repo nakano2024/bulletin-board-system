@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	thread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	thread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	gomock "go.uber.org/mock/gomock"
 )
 

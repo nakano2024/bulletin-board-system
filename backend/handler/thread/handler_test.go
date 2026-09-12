@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread/mock_thread"
 )

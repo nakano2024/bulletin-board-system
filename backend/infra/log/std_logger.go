@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-// StdLogger implements application/thread.ILogger using the standard library logger.
+// StdLogger implements application/usecase/thread.ILogger using the standard library logger.
 type StdLogger struct{}
 
 func NewStdLogger() *StdLogger {

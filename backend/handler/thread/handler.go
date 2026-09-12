@@ -7,7 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 )
 
 type ThreadResponse struct {
