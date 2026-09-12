@@ -1,0 +1,73 @@
+package thread_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
+)
+
+func TestNewPendingThread_正常系(t *testing.T) {
+	fileName, _ := thread.NewFileName("sample.png")
+
+	tests := []struct {
+		name     string
+		body     string
+		fileName *thread.FileName
+	}{
+		{
+			name:     "body・fileName(拡張子.png)が正常な値のとき、PendingThreadが生成されること",
+			body:     "hello",
+			fileName: fileName,
+		},
+		{
+			name:     "bodyが1文字のとき、PendingThreadが生成されること",
+			body:     "a",
+			fileName: fileName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := thread.NewPendingThread(tt.body, tt.fileName)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.body, got.Body())
+			assert.Equal(t, tt.fileName, got.FileName())
+		})
+	}
+}
+
+func TestNewPendingThread_異常系(t *testing.T) {
+	pngFileName, _ := thread.NewFileName("sample.png")
+
+	tests := []struct {
+		name     string
+		body     string
+		fileName *thread.FileName
+		wantErr  error
+	}{
+		{
+			name:     "bodyが空文字のとき、ErrPendingThreadBodyEmptyが返ること",
+			body:     "",
+			fileName: pngFileName,
+			wantErr:  thread.ErrPendingThreadBodyEmpty,
+		},
+		{
+			name:     "fileNameがnilのとき、ErrPendingThreadFileNameMissingが返ること",
+			body:     "hello",
+			fileName: nil,
+			wantErr:  thread.ErrPendingThreadFileNameMissing,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := thread.NewPendingThread(tt.body, tt.fileName)
+
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}

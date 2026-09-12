@@ -30,7 +30,7 @@ func NewListThreadsUsecase(threadRepository domainthread.IThreadRepository, logg
 }
 
 func (u *ListThreadsUsecase) Exec(ctx context.Context, cmd ListThreadsCommand) (*ListThreadsOutput, error) {
-	threadList, err := u.threadRepository.FetchActiveThreadList(ctx)
+	threadList, err := u.threadRepository.FetchActiveThreadListNewestFirst(ctx)
 	if err != nil {
 		u.logger.Error(ctx, err)
 		return nil, err

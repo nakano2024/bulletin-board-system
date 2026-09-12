@@ -10,7 +10,7 @@ import (
 )
 
 // querier is satisfied by both *pgxpool.Pool and pgx.Tx, so tests can run
-// FetchActiveThreadList inside a transaction for isolation.
+// FetchActiveThreadListNewestFirst inside a transaction for isolation.
 type querier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 }
@@ -26,8 +26,8 @@ func NewPostgresThreadRepository(db querier, baseThreadImagePath string) *Postgr
 	return &PostgresThreadRepository{db: db, baseThreadImagePath: baseThreadImagePath}
 }
 
-func (r *PostgresThreadRepository) FetchActiveThreadList(ctx context.Context) (*domainthread.ThreadList, error) {
-	rows, err := r.db.Query(ctx, "SELECT id, body, file_name, created_at FROM threads WHERE is_alive = true ORDER BY created_at ASC")
+func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*domainthread.ThreadList, error) {
+	rows, err := r.db.Query(ctx, "SELECT id, body, file_name, created_at FROM threads WHERE is_alive = true ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}

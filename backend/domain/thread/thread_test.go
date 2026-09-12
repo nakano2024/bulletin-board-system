@@ -12,7 +12,7 @@ import (
 
 func TestNewThread_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	filePath, err := thread.NewFilePath("images/", "sample123")
+	filePath, err := thread.NewFilePath("images/", "sample.png")
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -29,7 +29,7 @@ func TestNewThread_正常系(t *testing.T) {
 			body:              "hello",
 			filePath:          filePath,
 			createdAt:         fixedTime,
-			wantFilePathValue: "images/sample123",
+			wantFilePathValue: "images/sample.png",
 		},
 		{
 			name:              "bodyが1文字のとき、Threadが生成されること",
@@ -37,7 +37,7 @@ func TestNewThread_正常系(t *testing.T) {
 			body:              "a",
 			filePath:          filePath,
 			createdAt:         fixedTime,
-			wantFilePathValue: "images/sample123",
+			wantFilePathValue: "images/sample.png",
 		},
 	}
 

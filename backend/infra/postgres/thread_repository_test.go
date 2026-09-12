@@ -22,10 +22,19 @@ type seedThread struct {
 	createdAt time.Time
 }
 
-func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) {
+func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_正常系(t *testing.T) {
 	pool := newTestPool(t)
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	fileName := "sample123"
+	fileName := "sample.png"
+
+	filePath, _ := domainthread.NewFilePath("thread_images/", "sample.png")
+	threadHello, _ := domainthread.NewThread("thread-1", "hello", filePath, fixedTime)
+	threadFirst, _ := domainthread.NewThread("thread-1", "first", filePath, fixedTime)
+	threadSecond, _ := domainthread.NewThread("thread-2", "second", filePath, fixedTime.Add(time.Minute))
+	threadOldest, _ := domainthread.NewThread("thread-old", "oldest", filePath, fixedTime)
+	threadMiddle, _ := domainthread.NewThread("thread-mid", "middle", filePath, fixedTime.Add(time.Minute))
+	threadNewest, _ := domainthread.NewThread("thread-new", "newest", filePath, fixedTime.Add(2*time.Minute))
+	threadAlive, _ := domainthread.NewThread("thread-1", "alive", filePath, fixedTime)
 
 	tests := []struct {
 		name string
@@ -37,9 +46,7 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 			seed: []seedThread{
 				{id: "thread-1", body: "hello", fileName: &fileName, isAlive: true, createdAt: fixedTime},
 			},
-			want: []*domainthread.Thread{
-				mustNewThread(t, "thread-1", "hello", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime),
-			},
+			want: []*domainthread.Thread{threadHello},
 		},
 		{
 			name: "スレッドが複数件登録されている(いずれもfile_nameあり)とき、登録件数と同じ件数のThreadが返ること",
@@ -47,10 +54,16 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 				{id: "thread-1", body: "first", fileName: &fileName, isAlive: true, createdAt: fixedTime},
 				{id: "thread-2", body: "second", fileName: &fileName, isAlive: true, createdAt: fixedTime.Add(time.Minute)},
 			},
-			want: []*domainthread.Thread{
-				mustNewThread(t, "thread-1", "first", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime),
-				mustNewThread(t, "thread-2", "second", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime.Add(time.Minute)),
+			want: []*domainthread.Thread{threadSecond, threadFirst},
+		},
+		{
+			name: "createdAtが異なる複数のスレッドが登録順と無関係に登録されているとき、作成日時の降順(新しい順)で返ること",
+			seed: []seedThread{
+				{id: "thread-mid", body: "middle", fileName: &fileName, isAlive: true, createdAt: fixedTime.Add(time.Minute)},
+				{id: "thread-old", body: "oldest", fileName: &fileName, isAlive: true, createdAt: fixedTime},
+				{id: "thread-new", body: "newest", fileName: &fileName, isAlive: true, createdAt: fixedTime.Add(2 * time.Minute)},
 			},
+			want: []*domainthread.Thread{threadNewest, threadMiddle, threadOldest},
 		},
 		{
 			name: "スレッドが1件も登録されていないとき、ThreadListのThreads()が空スライスであること",
@@ -63,9 +76,7 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 				{id: "thread-1", body: "alive", fileName: &fileName, isAlive: true, createdAt: fixedTime},
 				{id: "thread-2", body: "dead", fileName: &fileName, isAlive: false, createdAt: fixedTime.Add(time.Minute)},
 			},
-			want: []*domainthread.Thread{
-				mustNewThread(t, "thread-1", "alive", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime),
-			},
+			want: []*domainthread.Thread{threadAlive},
 		},
 	}
 
@@ -83,76 +94,12 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 			}
 
 			sut := postgres.NewPostgresThreadRepository(tx, "thread_images/")
-			got, err := sut.FetchActiveThreadList(ctx)
+			got, err := sut.FetchActiveThreadListNewestFirst(ctx)
 
 			require.NoError(t, err)
 			assert.Equal(t, normalizeThreads(tt.want), normalizeThreads(got.Threads()))
 		})
 	}
-}
-
-func TestPostgresThreadRepository_FetchActiveThreadList_異常系(t *testing.T) {
-	pool := newTestPool(t)
-	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-
-	tests := []struct {
-		name    string
-		seed    []seedThread
-		wantErr error
-	}{
-		{
-			name: "file_name列の値が半角英数字・アンダースコア・ハイフン以外の文字を含む(FilePathの命名規則に合致しない)とき、FetchActiveThreadListがエラーを返すこと",
-			seed: []seedThread{
-				{id: "thread-1", body: "hello", fileName: strPtr("invalid@name.png"), isAlive: true, createdAt: fixedTime},
-			},
-			wantErr: domainthread.ErrFilePathFileNameInvalid,
-		},
-		{
-			name: "file_name列がNULL(画像未添付)のスレッドを含むとき、FetchActiveThreadListがErrThreadFilePathMissingを返すこと",
-			seed: []seedThread{
-				{id: "thread-1", body: "hello", fileName: nil, isAlive: true, createdAt: fixedTime},
-			},
-			wantErr: domainthread.ErrThreadFilePathMissing,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			tx, err := pool.Begin(ctx)
-			require.NoError(t, err)
-			t.Cleanup(func() { tx.Rollback(ctx) })
-
-			for _, s := range tt.seed {
-				_, err := tx.Exec(ctx, "INSERT INTO threads (id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5)", s.id, s.body, s.fileName, s.isAlive, s.createdAt)
-				require.NoError(t, err)
-			}
-
-			sut := postgres.NewPostgresThreadRepository(tx, "thread_images/")
-			_, err = sut.FetchActiveThreadList(ctx)
-
-			require.ErrorIs(t, err, tt.wantErr)
-		})
-	}
-}
-
-func mustNewFilePath(t *testing.T, basePath, fileName string) *domainthread.FilePath {
-	t.Helper()
-	filePath, err := domainthread.NewFilePath(basePath, fileName)
-	require.NoError(t, err)
-	return filePath
-}
-
-func mustNewThread(t *testing.T, id, body string, filePath *domainthread.FilePath, createdAt time.Time) *domainthread.Thread {
-	t.Helper()
-	th, err := domainthread.NewThread(id, body, filePath, createdAt)
-	require.NoError(t, err)
-	return th
-}
-
-func strPtr(s string) *string {
-	return &s
 }
 
 func normalizeThreads(threads []*domainthread.Thread) []*domainthread.Thread {

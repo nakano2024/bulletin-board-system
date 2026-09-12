@@ -41,17 +41,17 @@ func (m *MockIThreadRepository) EXPECT() *MockIThreadRepositoryMockRecorder {
 	return m.recorder
 }
 
-// FetchActiveThreadList mocks base method.
-func (m *MockIThreadRepository) FetchActiveThreadList(ctx context.Context) (*thread.ThreadList, error) {
+// FetchActiveThreadListNewestFirst mocks base method.
+func (m *MockIThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*thread.ThreadList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FetchActiveThreadList", ctx)
+	ret := m.ctrl.Call(m, "FetchActiveThreadListNewestFirst", ctx)
 	ret0, _ := ret[0].(*thread.ThreadList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// FetchActiveThreadList indicates an expected call of FetchActiveThreadList.
-func (mr *MockIThreadRepositoryMockRecorder) FetchActiveThreadList(ctx any) *gomock.Call {
+// FetchActiveThreadListNewestFirst indicates an expected call of FetchActiveThreadListNewestFirst.
+func (mr *MockIThreadRepositoryMockRecorder) FetchActiveThreadListNewestFirst(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchActiveThreadList", reflect.TypeOf((*MockIThreadRepository)(nil).FetchActiveThreadList), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchActiveThreadListNewestFirst", reflect.TypeOf((*MockIThreadRepository)(nil).FetchActiveThreadListNewestFirst), ctx)
 }

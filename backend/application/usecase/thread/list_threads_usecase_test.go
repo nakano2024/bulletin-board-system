@@ -17,9 +17,9 @@ import (
 
 func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	imagePath := "images/thread1png"
+	imagePath := "images/thread1.png"
 
-	filePath, _ := domainthread.NewFilePath("images/", "thread1png")
+	filePath, _ := domainthread.NewFilePath("images/", "thread1.png")
 	threadWithImage, _ := domainthread.NewThread("thread-1", "hello", filePath, fixedTime)
 	secondThreadWithImage, _ := domainthread.NewThread("thread-2", "second", filePath, fixedTime.Add(time.Minute))
 
@@ -31,7 +31,7 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 		{
 			name: "スレッドが1件存在するとき、Outputの要素にID/Body/ImagePath/CreatedAtが正しく変換されて含まれること",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithImage}), nil)
+				m.EXPECT().FetchActiveThreadListNewestFirst(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithImage}), nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{
@@ -42,7 +42,7 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 		{
 			name: "スレッドが複数件存在するとき、Outputの件数・順序が一致すること",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithImage, secondThreadWithImage}), nil)
+				m.EXPECT().FetchActiveThreadListNewestFirst(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithImage, secondThreadWithImage}), nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{
@@ -54,7 +54,7 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 		{
 			name: "スレッドが0件のとき、Outputの Threads が空スライスであること",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{}), nil)
+				m.EXPECT().FetchActiveThreadListNewestFirst(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{}), nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{},
@@ -89,7 +89,7 @@ func TestListThreadsUsecase_Exec_異常系(t *testing.T) {
 		{
 			name: "スレッド一覧の取得に失敗するとき、Execはエラーを返すこと",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(nil, errRepositoryFailed)
+				m.EXPECT().FetchActiveThreadListNewestFirst(gomock.Any()).Return(nil, errRepositoryFailed)
 			},
 			wantErr: errRepositoryFailed,
 		},
@@ -122,7 +122,7 @@ func TestListThreadsUsecase_Exec_ログ出力(t *testing.T) {
 		{
 			name: "スレッド一覧の取得に失敗するとき、ILoggerにリポジトリのエラーがそのまま渡されること",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(nil, errRepositoryFailed)
+				m.EXPECT().FetchActiveThreadListNewestFirst(gomock.Any()).Return(nil, errRepositoryFailed)
 			},
 			wantLogErr: errRepositoryFailed,
 		},
