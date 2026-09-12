@@ -42,13 +42,13 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 			},
 		},
 		{
-			name: "スレッドが複数件登録されている(file_nameがNULLの要素を含む)とき、登録件数と同じ件数のThreadが返り、file_nameがNULLの要素はFilePathValue()が空文字であること",
+			name: "スレッドが複数件登録されている(いずれもfile_nameあり)とき、登録件数と同じ件数のThreadが返ること",
 			seed: []seedThread{
-				{id: "thread-1", body: "first", fileName: nil, isAlive: true, createdAt: fixedTime},
+				{id: "thread-1", body: "first", fileName: &fileName, isAlive: true, createdAt: fixedTime},
 				{id: "thread-2", body: "second", fileName: &fileName, isAlive: true, createdAt: fixedTime.Add(time.Minute)},
 			},
 			want: []*domainthread.Thread{
-				mustNewThread(t, "thread-1", "first", nil, fixedTime),
+				mustNewThread(t, "thread-1", "first", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime),
 				mustNewThread(t, "thread-2", "second", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime.Add(time.Minute)),
 			},
 		},
@@ -60,11 +60,11 @@ func TestPostgresThreadRepository_FetchActiveThreadList_正常系(t *testing.T) 
 		{
 			name: "is_aliveがfalseのスレッドを含むとき、そのスレッドはThreadListに含まれないこと",
 			seed: []seedThread{
-				{id: "thread-1", body: "alive", fileName: nil, isAlive: true, createdAt: fixedTime},
-				{id: "thread-2", body: "dead", fileName: nil, isAlive: false, createdAt: fixedTime.Add(time.Minute)},
+				{id: "thread-1", body: "alive", fileName: &fileName, isAlive: true, createdAt: fixedTime},
+				{id: "thread-2", body: "dead", fileName: &fileName, isAlive: false, createdAt: fixedTime.Add(time.Minute)},
 			},
 			want: []*domainthread.Thread{
-				mustNewThread(t, "thread-1", "alive", nil, fixedTime),
+				mustNewThread(t, "thread-1", "alive", mustNewFilePath(t, "thread_images/", "sample123"), fixedTime),
 			},
 		},
 	}
@@ -96,14 +96,23 @@ func TestPostgresThreadRepository_FetchActiveThreadList_異常系(t *testing.T) 
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 
 	tests := []struct {
-		name string
-		seed []seedThread
+		name    string
+		seed    []seedThread
+		wantErr error
 	}{
 		{
 			name: "file_name列の値が半角英数字・アンダースコア・ハイフン以外の文字を含む(FilePathの命名規則に合致しない)とき、FetchActiveThreadListがエラーを返すこと",
 			seed: []seedThread{
 				{id: "thread-1", body: "hello", fileName: strPtr("invalid@name.png"), isAlive: true, createdAt: fixedTime},
 			},
+			wantErr: domainthread.ErrFilePathFileNameInvalid,
+		},
+		{
+			name: "file_name列がNULL(画像未添付)のスレッドを含むとき、FetchActiveThreadListがErrThreadFilePathMissingを返すこと",
+			seed: []seedThread{
+				{id: "thread-1", body: "hello", fileName: nil, isAlive: true, createdAt: fixedTime},
+			},
+			wantErr: domainthread.ErrThreadFilePathMissing,
 		},
 	}
 
@@ -123,7 +132,7 @@ func TestPostgresThreadRepository_FetchActiveThreadList_異常系(t *testing.T) 
 			sut := postgres.NewPostgresThreadRepository(tx, "thread_images/")
 			_, err = sut.FetchActiveThreadList(ctx)
 
-			require.Error(t, err)
+			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }

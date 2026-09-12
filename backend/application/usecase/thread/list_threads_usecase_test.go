@@ -21,7 +21,6 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 
 	filePath, _ := domainthread.NewFilePath("images/", "thread1png")
 	threadWithImage, _ := domainthread.NewThread("thread-1", "hello", filePath, fixedTime)
-	threadWithoutImage, _ := domainthread.NewThread("thread-1", "first", nil, fixedTime)
 	secondThreadWithImage, _ := domainthread.NewThread("thread-2", "second", filePath, fixedTime.Add(time.Minute))
 
 	tests := []struct {
@@ -43,11 +42,11 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 		{
 			name: "スレッドが複数件存在するとき、Outputの件数・順序が一致すること",
 			setupMock: func(m *mock_thread.MockIThreadRepository) {
-				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithoutImage, secondThreadWithImage}), nil)
+				m.EXPECT().FetchActiveThreadList(gomock.Any()).Return(domainthread.NewThreadList([]*domainthread.Thread{threadWithImage, secondThreadWithImage}), nil)
 			},
 			want: &thread.ListThreadsOutput{
 				Threads: []thread.ListThreadsOutputThread{
-					{ID: "thread-1", Body: "first", ImagePath: "", CreatedAt: fixedTime},
+					{ID: "thread-1", Body: "hello", ImagePath: imagePath, CreatedAt: fixedTime},
 					{ID: "thread-2", Body: "second", ImagePath: imagePath, CreatedAt: fixedTime.Add(time.Minute)},
 				},
 			},
