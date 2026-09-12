@@ -1,12 +1,12 @@
 services:
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
     volumes:
-      - ./backend:/app
+      - .:/app
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/bulletin_board?sslmode=disable
       THREAD_IMAGE_BASE_PATH: thread_images/
@@ -29,7 +29,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/infra/postgres/migrations:/docker-entrypoint-initdb.d:ro
+      - ./infra/postgres/migrations:/docker-entrypoint-initdb.d:ro
 
   redis:
     image: redis:7-alpine
