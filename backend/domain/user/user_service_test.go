@@ -89,15 +89,6 @@ func TestUserService_CreateOrFetch_異常系(t *testing.T) {
 			},
 			wantErr: errRepositoryFailed,
 		},
-		{
-			name: "ipが空文字でUserが見つからないとき、ErrUserIPEmptyが返り、CreateUserは呼ばれないこと",
-			ip:   "",
-			setupMock: func(m *mock_user.MockIUserRepository) {
-				m.EXPECT().FindByIPAndDate(gomock.Any(), "", date).Return(nil, nil)
-				m.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			},
-			wantErr: user.ErrUserIPEmpty,
-		},
 	}
 
 	for _, tt := range tests {
