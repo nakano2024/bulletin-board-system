@@ -18,7 +18,7 @@ import (
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread/mock_thread"
 )
 
-func TestThreadHandler_ListThreads_正常系(t *testing.T) {
+func TestListThreadsHandler_ListThreads_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	imagePath := "images/thread-1.png"
 
@@ -76,7 +76,7 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 
-			sut := thread.NewThreadHandler(usecase)
+			sut := thread.NewListThreadsHandler(usecase)
 			err := sut.ListThreads(c)
 
 			require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestThreadHandler_ListThreads_正常系(t *testing.T) {
 	}
 }
 
-func TestThreadHandler_ListThreads_異常系(t *testing.T) {
+func TestListThreadsHandler_ListThreads_異常系(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupMock     func(*mock_thread.MocklistThreadsUsecase)
@@ -118,7 +118,7 @@ func TestThreadHandler_ListThreads_異常系(t *testing.T) {
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
 
-			sut := thread.NewThreadHandler(usecase)
+			sut := thread.NewListThreadsHandler(usecase)
 			err := sut.ListThreads(c)
 
 			require.NoError(t, err)

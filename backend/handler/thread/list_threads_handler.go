@@ -26,15 +26,15 @@ type listThreadsUsecase interface {
 	Exec(ctx context.Context, cmd applicationthread.ListThreadsCommand) (*applicationthread.ListThreadsOutput, error)
 }
 
-type ThreadHandler struct {
+type ListThreadsHandler struct {
 	listThreadsUsecase listThreadsUsecase
 }
 
-func NewThreadHandler(listThreadsUsecase listThreadsUsecase) *ThreadHandler {
-	return &ThreadHandler{listThreadsUsecase: listThreadsUsecase}
+func NewListThreadsHandler(listThreadsUsecase listThreadsUsecase) *ListThreadsHandler {
+	return &ListThreadsHandler{listThreadsUsecase: listThreadsUsecase}
 }
 
-func (h *ThreadHandler) ListThreads(c echo.Context) error {
+func (h *ListThreadsHandler) ListThreads(c echo.Context) error {
 	output, err := h.listThreadsUsecase.Exec(c.Request().Context(), applicationthread.ListThreadsCommand{})
 	if err != nil {
 		c.Logger().Error(err)

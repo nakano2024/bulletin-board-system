@@ -10,9 +10,10 @@ import (
 )
 
 // querier is satisfied by both *pgxpool.Pool and pgx.Tx, so tests can run
-// FetchActiveThreadListNewestFirst inside a transaction for isolation.
+// FetchActiveThreadListNewestFirst/CreateThread inside a transaction for isolation.
 type querier interface {
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 type PostgresThreadRepository struct {
@@ -59,6 +60,27 @@ func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.
 	}
 
 	return domainthread.NewThreadList(threads), nil
+}
+
+func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThread *domainthread.PendingThread) (*domainthread.Thread, error) {
+	var id string
+	var createdAt time.Time
+
+	err := r.db.QueryRow(
+		ctx,
+		"INSERT INTO threads (user_id, body, file_name) VALUES ($1, $2, $3) RETURNING id, created_at",
+		pendingThread.UserID(), pendingThread.Body(), pendingThread.FileName().Value(),
+	).Scan(&id, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+
+	filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, pendingThread.FileName().Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return domainthread.NewThread(id, pendingThread.Body(), filePath, createdAt)
 }
 
 func (r *PostgresThreadRepository) filePathFromFileName(fileName *string) (*domainthread.FilePath, error) {

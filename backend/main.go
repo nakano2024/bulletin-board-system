@@ -9,7 +9,9 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
+	domainuser "github.com/nakanokota/bulletin-board-system/backend/domain/user"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/infra/clock"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"
 )
@@ -23,9 +25,15 @@ func main() {
 	}
 
 	threadRepository := postgres.NewPostgresThreadRepository(pool, os.Getenv("THREAD_IMAGE_BASE_PATH"))
+	userRepository := postgres.NewPostgresUserRepository(pool)
+	userService := domainuser.NewUserService(userRepository)
 	logger := infralog.NewStdLogger()
+	timeGetter := clock.NewStdTimeGetter()
+
 	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadRepository, logger)
-	threadHandler := thread.NewThreadHandler(listThreadsUsecase)
+	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadRepository, userService, timeGetter, logger)
+	listThreadsHandler := thread.NewListThreadsHandler(listThreadsUsecase)
+	createThreadHandler := thread.NewCreateThreadHandler(createThreadUsecase)
 
 	e := echo.New()
 	e.Use(middleware.Logger())
@@ -34,7 +42,8 @@ func main() {
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
-	e.GET("/threads", threadHandler.ListThreads)
+	e.GET("/threads", listThreadsHandler.ListThreads)
+	e.POST("/threads", createThreadHandler.CreateThread)
 
 	e.Logger.Fatal(e.Start(":8080"))
 }

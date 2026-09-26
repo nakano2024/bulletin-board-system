@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -16,12 +17,18 @@ import (
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
+	migrationScripts, err := filepath.Glob("../infra/postgres/migrations/*.sql")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to glob migration scripts:", err)
+		os.Exit(1)
+	}
+
 	container, err := tcpostgres.Run(ctx,
 		"postgres:16-alpine",
 		tcpostgres.WithDatabase("bulletin_board"),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword("postgres"),
-		tcpostgres.WithInitScripts("../infra/postgres/migrations/0001_create_threads.sql"),
+		tcpostgres.WithInitScripts(migrationScripts...),
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 		),

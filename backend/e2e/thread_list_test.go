@@ -32,8 +32,8 @@ func TestE2E_GetThreads_正常系(t *testing.T) {
 
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx,
-		"INSERT INTO threads (id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5)",
-		"thread-1", "hello e2e", "sample.png", true, fixedTime)
+		"INSERT INTO threads (id, user_id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+		"thread-1", "user-1", "hello e2e", "sample.png", true, fixedTime)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), "DELETE FROM threads WHERE id = $1", "thread-1")
@@ -42,14 +42,14 @@ func TestE2E_GetThreads_正常系(t *testing.T) {
 	threadRepository := postgres.NewPostgresThreadRepository(pool, "thread_images/")
 	logger := infralog.NewStdLogger()
 	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadRepository, logger)
-	threadHandler := handlerthread.NewThreadHandler(listThreadsUsecase)
+	listThreadsHandler := handlerthread.NewListThreadsHandler(listThreadsUsecase)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/threads", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	err = threadHandler.ListThreads(c)
+	err = listThreadsHandler.ListThreads(c)
 	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusOK, rec.Code)

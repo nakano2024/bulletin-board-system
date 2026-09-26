@@ -89,7 +89,7 @@ func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_正常系(t *
 			t.Cleanup(func() { tx.Rollback(ctx) })
 
 			for _, s := range tt.seed {
-				_, err := tx.Exec(ctx, "INSERT INTO threads (id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5)", s.id, s.body, s.fileName, s.isAlive, s.createdAt)
+				_, err := tx.Exec(ctx, "INSERT INTO threads (id, user_id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5, $6)", s.id, "user-1", s.body, s.fileName, s.isAlive, s.createdAt)
 				require.NoError(t, err)
 			}
 
@@ -100,6 +100,54 @@ func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_正常系(t *
 			assert.Equal(t, normalizeThreads(tt.want), normalizeThreads(got.Threads()))
 		})
 	}
+}
+
+func TestPostgresThreadRepository_CreateThread_正常系(t *testing.T) {
+	pool := newTestPool(t)
+	fileName, err := domainthread.NewFileName("sample.png")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		pendingThread *domainthread.PendingThread
+	}{
+		{
+			name:          "有効なPendingThreadを渡したとき、id・createdAtが採番されたThreadが返り、DBにも保存されること",
+			pendingThread: mustNewPendingThread(t, "user-1", "hello", fileName),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			tx, err := pool.Begin(ctx)
+			require.NoError(t, err)
+			t.Cleanup(func() { tx.Rollback(ctx) })
+
+			sut := postgres.NewPostgresThreadRepository(tx, "thread_images/")
+			got, err := sut.CreateThread(ctx, tt.pendingThread)
+
+			require.NoError(t, err)
+			assert.NotEmpty(t, got.ID())
+			assert.Equal(t, tt.pendingThread.Body(), got.Body())
+			assert.Equal(t, "thread_images/sample.png", got.FilePathValue())
+			assert.False(t, got.CreatedAt().IsZero())
+
+			var userID, body string
+			err = tx.QueryRow(ctx, "SELECT user_id, body FROM threads WHERE id = $1", got.ID()).Scan(&userID, &body)
+			require.NoError(t, err)
+			assert.Equal(t, tt.pendingThread.UserID(), userID)
+			assert.Equal(t, tt.pendingThread.Body(), body)
+		})
+	}
+}
+
+func mustNewPendingThread(t *testing.T, userID, body string, fileName *domainthread.FileName) *domainthread.PendingThread {
+	t.Helper()
+	pt, err := domainthread.NewPendingThread(userID, body, fileName)
+	require.NoError(t, err)
+	return pt
 }
 
 func normalizeThreads(threads []*domainthread.Thread) []*domainthread.Thread {
