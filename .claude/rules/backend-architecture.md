@@ -59,6 +59,10 @@ func (u *CreateThreadUsecase) Exec(ctx context.Context, cmd CreateThreadCommand)
 
 `Exec()` の中に業務判断の分岐が増えてきたら、その判断は domain 層に移せないか見直す。
 
+### エラー発生時のログ出力
+
+`Exec()` は、依存（`IRepository` / `IQueryService` / 汎用インフラ）がエラーを返したとき、`ILogger`（application 層の汎用インターフェイス、実装は infra に置く）経由でログに出力してからそのままエラーを返してよい。これは「取得 → 委譲 → 保存」という Exec() の組み立てに業務ロジックを追加するものではなく、失敗の発生元をユースケース単位で特定できるようにするための観測用の副作用として扱う。handler 層でも同じエラーに対して別途ログを出す場合があるが、責務が異なる（usecase 層はユースケース単位の失敗検知、handler 層はレスポンスへの変換に付随する記録）ため、両方に出力があってよい。
+
 ## 層間の I/O ルール
 
 | 経路 | やりとりに使う型 |
@@ -135,7 +139,8 @@ type CreateThreadOutput struct {
 | --- | --- | --- |
 | `IRepository` | `domain/` | ビジネスロジックに強く関係する永続化・取得。ドメインモデルをやりとりする |
 | `IQueryService` | `application/` | 表示や集計のための参照。DTO を返す |
-| その他（`ITimeGetter`, `IUuidGenerator`, `IRandomGenerator`, `IFileUploader` など） | `application/` | 汎用的な副作用の抽象化 |
+| その他（`ITimeGetter`, `IUuidGenerator`, `IRandomGenerator`, `IFileUploader` など） | `application/` | 汎用的な副作用の抽象化（値の生成・取得） |
+| `ILogger` | `application/` | ログ出力という観測用の副作用の抽象化。値を生成せずExec()に副作用を戻さない点で上記とは性質が異なるが、配置場所・実装先（`infra/`）の扱いは同じ |
 
 実装はすべて `infra/` に置く。インターフェイス名には `I` プレフィックスを付ける（Go の一般的な慣習とは異なるが、本プロジェクトの規約とする）。実装側は `PostgresThreadRepository` のように技術要素を含む名前にする。
 

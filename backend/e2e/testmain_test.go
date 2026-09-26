@@ -1,0 +1,57 @@
+package e2e
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/testcontainers/testcontainers-go"
+	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+// TestMain spins up a disposable Postgres container for the E2E suite,
+// points E2E_DATABASE_URL at it, and tears both down when the tests finish.
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+
+	migrationScripts, err := filepath.Glob("../infra/postgres/migrations/*.sql")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to glob migration scripts:", err)
+		os.Exit(1)
+	}
+
+	container, err := tcpostgres.Run(ctx,
+		"postgres:16-alpine",
+		tcpostgres.WithDatabase("bulletin_board"),
+		tcpostgres.WithUsername("postgres"),
+		tcpostgres.WithPassword("postgres"),
+		tcpostgres.WithInitScripts(migrationScripts...),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
+		),
+	)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to start postgres test container:", err)
+		os.Exit(1)
+	}
+
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to get postgres test container connection string:", err)
+		os.Exit(1)
+	}
+
+	os.Setenv("E2E_DATABASE_URL", dsn)
+
+	code := m.Run()
+
+	os.Unsetenv("E2E_DATABASE_URL")
+	if err := container.Terminate(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "failed to terminate postgres test container:", err)
+	}
+
+	os.Exit(code)
+}

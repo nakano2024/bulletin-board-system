@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    user_id TEXT NOT NULL,
     body TEXT NOT NULL,
-    image_path TEXT,
+    file_name TEXT,
+    is_alive BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

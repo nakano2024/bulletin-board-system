@@ -7,13 +7,13 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/thread"
+	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 )
 
 type ThreadResponse struct {
 	ID        string    `json:"id"`
 	Body      string    `json:"body"`
-	ImagePath *string   `json:"image_path"`
+	ImagePath string    `json:"image_path"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -26,17 +26,18 @@ type listThreadsUsecase interface {
 	Exec(ctx context.Context, cmd applicationthread.ListThreadsCommand) (*applicationthread.ListThreadsOutput, error)
 }
 
-type ThreadHandler struct {
+type ListThreadsHandler struct {
 	listThreadsUsecase listThreadsUsecase
 }
 
-func NewThreadHandler(listThreadsUsecase listThreadsUsecase) *ThreadHandler {
-	return &ThreadHandler{listThreadsUsecase: listThreadsUsecase}
+func NewListThreadsHandler(listThreadsUsecase listThreadsUsecase) *ListThreadsHandler {
+	return &ListThreadsHandler{listThreadsUsecase: listThreadsUsecase}
 }
 
-func (h *ThreadHandler) ListThreads(c echo.Context) error {
+func (h *ListThreadsHandler) ListThreads(c echo.Context) error {
 	output, err := h.listThreadsUsecase.Exec(c.Request().Context(), applicationthread.ListThreadsCommand{})
 	if err != nil {
+		c.Logger().Error(err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "スレッド一覧の取得に失敗しました。"})
 	}
 
