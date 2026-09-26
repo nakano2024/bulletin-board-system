@@ -17,32 +17,32 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockIThreadRepository is a mock of IThreadRepository interface.
-type MockIThreadRepository struct {
+// MockIThreadFetcher is a mock of IThreadFetcher interface.
+type MockIThreadFetcher struct {
 	ctrl     *gomock.Controller
-	recorder *MockIThreadRepositoryMockRecorder
+	recorder *MockIThreadFetcherMockRecorder
 	isgomock struct{}
 }
 
-// MockIThreadRepositoryMockRecorder is the mock recorder for MockIThreadRepository.
-type MockIThreadRepositoryMockRecorder struct {
-	mock *MockIThreadRepository
+// MockIThreadFetcherMockRecorder is the mock recorder for MockIThreadFetcher.
+type MockIThreadFetcherMockRecorder struct {
+	mock *MockIThreadFetcher
 }
 
-// NewMockIThreadRepository creates a new mock instance.
-func NewMockIThreadRepository(ctrl *gomock.Controller) *MockIThreadRepository {
-	mock := &MockIThreadRepository{ctrl: ctrl}
-	mock.recorder = &MockIThreadRepositoryMockRecorder{mock}
+// NewMockIThreadFetcher creates a new mock instance.
+func NewMockIThreadFetcher(ctrl *gomock.Controller) *MockIThreadFetcher {
+	mock := &MockIThreadFetcher{ctrl: ctrl}
+	mock.recorder = &MockIThreadFetcherMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockIThreadRepository) EXPECT() *MockIThreadRepositoryMockRecorder {
+func (m *MockIThreadFetcher) EXPECT() *MockIThreadFetcherMockRecorder {
 	return m.recorder
 }
 
 // FetchActiveThreadListNewestFirst mocks base method.
-func (m *MockIThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*thread.ThreadList, error) {
+func (m *MockIThreadFetcher) FetchActiveThreadListNewestFirst(ctx context.Context) (*thread.ThreadList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FetchActiveThreadListNewestFirst", ctx)
 	ret0, _ := ret[0].(*thread.ThreadList)
@@ -51,7 +51,46 @@ func (m *MockIThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Con
 }
 
 // FetchActiveThreadListNewestFirst indicates an expected call of FetchActiveThreadListNewestFirst.
-func (mr *MockIThreadRepositoryMockRecorder) FetchActiveThreadListNewestFirst(ctx any) *gomock.Call {
+func (mr *MockIThreadFetcherMockRecorder) FetchActiveThreadListNewestFirst(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchActiveThreadListNewestFirst", reflect.TypeOf((*MockIThreadRepository)(nil).FetchActiveThreadListNewestFirst), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchActiveThreadListNewestFirst", reflect.TypeOf((*MockIThreadFetcher)(nil).FetchActiveThreadListNewestFirst), ctx)
+}
+
+// MockIPendingThreadRepository is a mock of IPendingThreadRepository interface.
+type MockIPendingThreadRepository struct {
+	ctrl     *gomock.Controller
+	recorder *MockIPendingThreadRepositoryMockRecorder
+	isgomock struct{}
+}
+
+// MockIPendingThreadRepositoryMockRecorder is the mock recorder for MockIPendingThreadRepository.
+type MockIPendingThreadRepositoryMockRecorder struct {
+	mock *MockIPendingThreadRepository
+}
+
+// NewMockIPendingThreadRepository creates a new mock instance.
+func NewMockIPendingThreadRepository(ctrl *gomock.Controller) *MockIPendingThreadRepository {
+	mock := &MockIPendingThreadRepository{ctrl: ctrl}
+	mock.recorder = &MockIPendingThreadRepositoryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIPendingThreadRepository) EXPECT() *MockIPendingThreadRepositoryMockRecorder {
+	return m.recorder
+}
+
+// CreateThread mocks base method.
+func (m *MockIPendingThreadRepository) CreateThread(ctx context.Context, pendingThread *thread.PendingThread) (*thread.Thread, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateThread", ctx, pendingThread)
+	ret0, _ := ret[0].(*thread.Thread)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateThread indicates an expected call of CreateThread.
+func (mr *MockIPendingThreadRepositoryMockRecorder) CreateThread(ctx, pendingThread any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateThread", reflect.TypeOf((*MockIPendingThreadRepository)(nil).CreateThread), ctx, pendingThread)
 }

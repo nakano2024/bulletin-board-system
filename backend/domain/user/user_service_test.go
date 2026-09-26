@@ -14,10 +14,10 @@ import (
 	"github.com/nakanokota/bulletin-board-system/backend/domain/user/mock_user"
 )
 
-func TestUserService_CreateOrFetch_正常系(t *testing.T) {
+func TestUserService_FetchOrCreate_正常系(t *testing.T) {
 	ip := "203.0.113.1"
-	date := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
-	pendingUser, _ := user.NewPendingUser(ip)
+	date, _ := user.NewUserCreateDate(time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC))
+	pendingUser, _ := user.NewPendingUser(ip, date)
 	existingUser, _ := user.NewUser("user-1", ip)
 	createdUser, _ := user.NewUser("user-2", ip)
 
@@ -30,7 +30,7 @@ func TestUserService_CreateOrFetch_正常系(t *testing.T) {
 			name: "同一IP・同一日のUserが既に存在するとき、そのUserがそのまま返り、CreateUserは呼ばれないこと",
 			setupMock: func(m *mock_user.MockIUserRepository) {
 				m.EXPECT().FindByIPAndDate(gomock.Any(), ip, date).Return(existingUser, nil)
-				m.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				m.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Times(0)
 			},
 			want: existingUser,
 		},
@@ -38,7 +38,7 @@ func TestUserService_CreateOrFetch_正常系(t *testing.T) {
 			name: "同一IP・同一日のUserが存在しないとき、CreateUserで作成されたUserが返ること",
 			setupMock: func(m *mock_user.MockIUserRepository) {
 				m.EXPECT().FindByIPAndDate(gomock.Any(), ip, date).Return(nil, nil)
-				m.EXPECT().CreateUser(gomock.Any(), pendingUser, date).Return(createdUser, nil)
+				m.EXPECT().CreateUser(gomock.Any(), pendingUser).Return(createdUser, nil)
 			},
 			want: createdUser,
 		},
@@ -51,7 +51,7 @@ func TestUserService_CreateOrFetch_正常系(t *testing.T) {
 			tt.setupMock(userRepository)
 
 			sut := user.NewUserService(userRepository)
-			got, err := sut.CreateOrFetch(context.Background(), ip, date)
+			got, err := sut.FetchOrCreate(context.Background(), ip, date)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -59,10 +59,10 @@ func TestUserService_CreateOrFetch_正常系(t *testing.T) {
 	}
 }
 
-func TestUserService_CreateOrFetch_異常系(t *testing.T) {
+func TestUserService_FetchOrCreate_異常系(t *testing.T) {
 	ip := "203.0.113.1"
-	date := time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC)
-	pendingUser, _ := user.NewPendingUser(ip)
+	date, _ := user.NewUserCreateDate(time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC))
+	pendingUser, _ := user.NewPendingUser(ip, date)
 	errRepositoryFailed := errors.New("repository failed")
 
 	tests := []struct {
@@ -72,20 +72,20 @@ func TestUserService_CreateOrFetch_異常系(t *testing.T) {
 		wantErr   error
 	}{
 		{
-			name: "FindByIPAndDateがエラーを返すとき、CreateOrFetchはエラーを返し、CreateUserは呼ばれないこと",
+			name: "FindByIPAndDateがエラーを返すとき、FetchOrCreateはエラーを返し、CreateUserは呼ばれないこと",
 			ip:   ip,
 			setupMock: func(m *mock_user.MockIUserRepository) {
 				m.EXPECT().FindByIPAndDate(gomock.Any(), ip, date).Return(nil, errRepositoryFailed)
-				m.EXPECT().CreateUser(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				m.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Times(0)
 			},
 			wantErr: errRepositoryFailed,
 		},
 		{
-			name: "Userが存在せずCreateUserがエラーを返すとき、CreateOrFetchはそのエラーを返すこと",
+			name: "Userが存在せずCreateUserがエラーを返すとき、FetchOrCreateはそのエラーを返すこと",
 			ip:   ip,
 			setupMock: func(m *mock_user.MockIUserRepository) {
 				m.EXPECT().FindByIPAndDate(gomock.Any(), ip, date).Return(nil, nil)
-				m.EXPECT().CreateUser(gomock.Any(), pendingUser, date).Return(nil, errRepositoryFailed)
+				m.EXPECT().CreateUser(gomock.Any(), pendingUser).Return(nil, errRepositoryFailed)
 			},
 			wantErr: errRepositoryFailed,
 		},
@@ -98,7 +98,7 @@ func TestUserService_CreateOrFetch_異常系(t *testing.T) {
 			tt.setupMock(userRepository)
 
 			sut := user.NewUserService(userRepository)
-			_, err := sut.CreateOrFetch(context.Background(), tt.ip, date)
+			_, err := sut.FetchOrCreate(context.Background(), tt.ip, date)
 
 			require.ErrorIs(t, err, tt.wantErr)
 		})

@@ -21,16 +21,16 @@ type ListThreadsOutput struct {
 }
 
 type ListThreadsUsecase struct {
-	threadRepository domainthread.IThreadRepository
-	logger           ILogger
+	threadFetcher domainthread.IThreadFetcher
+	logger        ILogger
 }
 
-func NewListThreadsUsecase(threadRepository domainthread.IThreadRepository, logger ILogger) *ListThreadsUsecase {
-	return &ListThreadsUsecase{threadRepository: threadRepository, logger: logger}
+func NewListThreadsUsecase(threadFetcher domainthread.IThreadFetcher, logger ILogger) *ListThreadsUsecase {
+	return &ListThreadsUsecase{threadFetcher: threadFetcher, logger: logger}
 }
 
 func (u *ListThreadsUsecase) Exec(ctx context.Context, cmd ListThreadsCommand) (*ListThreadsOutput, error) {
-	threadList, err := u.threadRepository.FetchActiveThreadListNewestFirst(ctx)
+	threadList, err := u.threadFetcher.FetchActiveThreadListNewestFirst(ctx)
 	if err != nil {
 		u.logger.Error(ctx, err)
 		return nil, err

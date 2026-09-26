@@ -12,7 +12,6 @@ package mock_user
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	user "github.com/nakanokota/bulletin-board-system/backend/domain/user"
 	gomock "go.uber.org/mock/gomock"
@@ -43,22 +42,22 @@ func (m *MockIUserRepository) EXPECT() *MockIUserRepositoryMockRecorder {
 }
 
 // CreateUser mocks base method.
-func (m *MockIUserRepository) CreateUser(ctx context.Context, pendingUser *user.PendingUser, date time.Time) (*user.User, error) {
+func (m *MockIUserRepository) CreateUser(ctx context.Context, pendingUser *user.PendingUser) (*user.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateUser", ctx, pendingUser, date)
+	ret := m.ctrl.Call(m, "CreateUser", ctx, pendingUser)
 	ret0, _ := ret[0].(*user.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateUser indicates an expected call of CreateUser.
-func (mr *MockIUserRepositoryMockRecorder) CreateUser(ctx, pendingUser, date any) *gomock.Call {
+func (mr *MockIUserRepositoryMockRecorder) CreateUser(ctx, pendingUser any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockIUserRepository)(nil).CreateUser), ctx, pendingUser, date)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockIUserRepository)(nil).CreateUser), ctx, pendingUser)
 }
 
 // FindByIPAndDate mocks base method.
-func (m *MockIUserRepository) FindByIPAndDate(ctx context.Context, ip string, date time.Time) (*user.User, error) {
+func (m *MockIUserRepository) FindByIPAndDate(ctx context.Context, ip string, date *user.UserCreateDate) (*user.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindByIPAndDate", ctx, ip, date)
 	ret0, _ := ret[0].(*user.User)
