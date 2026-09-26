@@ -16,6 +16,7 @@ import (
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	domainuser "github.com/nakanokota/bulletin-board-system/backend/domain/user"
+	"github.com/nakanokota/bulletin-board-system/backend/handler"
 	handlerthread "github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/clock"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
@@ -46,6 +47,7 @@ func TestE2E_CreateThread_正常系(t *testing.T) {
 	createThreadHandler := handlerthread.NewCreateThreadHandler(createThreadUsecase)
 
 	e := echo.New()
+	e.Validator = handler.NewRequestValidator()
 	req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello e2e","file_name":"sample.png"}}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	req.RemoteAddr = ip + ":12345"

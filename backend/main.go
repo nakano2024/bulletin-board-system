@@ -10,6 +10,7 @@ import (
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	domainuser "github.com/nakanokota/bulletin-board-system/backend/domain/user"
+	"github.com/nakanokota/bulletin-board-system/backend/handler"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/clock"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
@@ -38,6 +39,7 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Validator = handler.NewRequestValidator()
 
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})

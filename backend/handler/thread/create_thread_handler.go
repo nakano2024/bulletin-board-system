@@ -13,7 +13,7 @@ import (
 
 type CreateThreadRequestBody struct {
 	Body     string `json:"body"`
-	FileName string `json:"file_name"`
+	FileName string `json:"file_name" validate:"omitempty,excludesall=/\\"`
 }
 
 type CreateThreadRequest struct {
@@ -44,6 +44,9 @@ func NewCreateThreadHandler(createThreadUsecase createThreadUsecase) *CreateThre
 func (h *CreateThreadHandler) CreateThread(c echo.Context) error {
 	var req CreateThreadRequest
 	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "リクエストの形式が不正です。"})
+	}
+	if err := c.Validate(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "リクエストの形式が不正です。"})
 	}
 

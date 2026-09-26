@@ -15,6 +15,7 @@ import (
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/handler"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread/mock_thread"
 )
@@ -47,6 +48,7 @@ func TestCreateThreadHandler_CreateThread_正常系(t *testing.T) {
 			tt.setupMock(usecase)
 
 			e := echo.New()
+			e.Validator = handler.NewRequestValidator()
 			req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello","file_name":"sample.png"}}`))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			req.RemoteAddr = "192.0.2.1:12345"
@@ -114,6 +116,20 @@ func TestCreateThreadHandler_CreateThread_異常系(t *testing.T) {
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   `{"message":"スレッドの作成に失敗しました。"}` + "\n",
 		},
+		{
+			name:       "画像ファイル名にディレクトリ区切り(/)が含まれるとき、Usecaseを呼び出さずステータス400が返ること",
+			body:       `{"thread":{"body":"hello","file_name":"sub/sample.png"}}`,
+			setupMock:  func(m *mock_thread.MockcreateThreadUsecase) {},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   `{"message":"リクエストの形式が不正です。"}` + "\n",
+		},
+		{
+			name:       "画像ファイル名にディレクトリ区切り(\\)が含まれるとき、Usecaseを呼び出さずステータス400が返ること",
+			body:       `{"thread":{"body":"hello","file_name":"sub\\sample.png"}}`,
+			setupMock:  func(m *mock_thread.MockcreateThreadUsecase) {},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   `{"message":"リクエストの形式が不正です。"}` + "\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -123,6 +139,7 @@ func TestCreateThreadHandler_CreateThread_異常系(t *testing.T) {
 			tt.setupMock(usecase)
 
 			e := echo.New()
+			e.Validator = handler.NewRequestValidator()
 			req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(tt.body))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			rec := httptest.NewRecorder()
@@ -161,6 +178,7 @@ func TestCreateThreadHandler_CreateThread_ログ出力(t *testing.T) {
 
 			var logBuf bytes.Buffer
 			e := echo.New()
+			e.Validator = handler.NewRequestValidator()
 			e.Logger.SetOutput(&logBuf)
 			req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello","file_name":"sample.png"}}`))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
