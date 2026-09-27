@@ -43,15 +43,7 @@ func TestE2E_CreateThread_正常系(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE ip = $1", ip)
 	})
 
-	threadRepository := postgres.NewPostgresThreadRepository(pool, "thread_images/")
-	threadFileChecker := postgres.NewPostgresThreadFileChecker(pool)
-	userRepository := postgres.NewPostgresUserRepository(pool)
-	threadCreationService := domainthread.NewThreadCreationService(threadFileChecker, threadRepository)
-	userService := domainuser.NewUserService(userRepository)
-	logger := infralog.NewStdLogger()
-	timeGetter := clock.NewStdTimeGetter()
-	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadCreationService, userService, timeGetter, logger)
-	createThreadHandler := handlerthread.NewCreateThreadHandler(createThreadUsecase)
+	createThreadHandler := newE2ECreateThreadHandler(pool)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello e2e","file_id":"`+fileID+`"}}`))
@@ -79,4 +71,51 @@ func TestE2E_CreateThread_正常系(t *testing.T) {
 	err = pool.QueryRow(ctx, "SELECT ip FROM users WHERE id = $1", storedUserID).Scan(&storedIP)
 	require.NoError(t, err)
 	assert.Equal(t, ip, storedIP)
+}
+
+// TestE2E_CreateThread_異常系_ロールバック checks that the whole creation runs in one transaction: the poster's user row
+// is created before the file check, so a request with an unknown file_id must not leave that row behind.
+func TestE2E_CreateThread_異常系_ロールバック(t *testing.T) {
+	ctx := context.Background()
+	ip := "203.0.113.51"
+
+	pool, err := pgxpool.New(ctx, os.Getenv("E2E_DATABASE_URL"))
+	require.NoError(t, err)
+	t.Cleanup(pool.Close)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE ip = $1", ip)
+	})
+
+	createThreadHandler := newE2ECreateThreadHandler(pool)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello e2e","file_id":"file-e2e-missing"}}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.RemoteAddr = ip + ":12345"
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	err = createThreadHandler.CreateThread(c)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	var userCount int
+	err = pool.QueryRow(ctx, "SELECT count(*) FROM users WHERE ip = $1", ip).Scan(&userCount)
+	require.NoError(t, err)
+	assert.Equal(t, 0, userCount)
+}
+
+// newE2ECreateThreadHandler assembles POST /threads the same way main.go does, with no mocks.
+func newE2ECreateThreadHandler(pool *pgxpool.Pool) *handlerthread.CreateThreadHandler {
+	threadRepository := postgres.NewPostgresThreadRepository(pool, "thread_images/")
+	threadFileChecker := postgres.NewPostgresThreadFileChecker(pool)
+	userRepository := postgres.NewPostgresUserRepository(pool)
+	txManager := postgres.NewPostgresTransactionManager(pool)
+	threadCreationService := domainthread.NewThreadCreationService(threadFileChecker, threadRepository)
+	userService := domainuser.NewUserService(userRepository)
+	logger := infralog.NewStdLogger()
+	timeGetter := clock.NewStdTimeGetter()
+	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadCreationService, userService, timeGetter, txManager, logger)
+	return handlerthread.NewCreateThreadHandler(createThreadUsecase)
 }

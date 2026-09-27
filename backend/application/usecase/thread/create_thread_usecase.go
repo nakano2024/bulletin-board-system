@@ -23,6 +23,7 @@ type CreateThreadUsecase struct {
 	threadCreationService *domainthread.ThreadCreationService
 	userService           *domainuser.UserService
 	timeGetter            ITimeGetter
+	txManager             ITransactionManager
 	logger                ILogger
 }
 
@@ -30,36 +31,54 @@ func NewCreateThreadUsecase(
 	threadCreationService *domainthread.ThreadCreationService,
 	userService *domainuser.UserService,
 	timeGetter ITimeGetter,
+	txManager ITransactionManager,
 	logger ILogger,
 ) *CreateThreadUsecase {
 	return &CreateThreadUsecase{
 		threadCreationService: threadCreationService,
 		userService:           userService,
 		timeGetter:            timeGetter,
+		txManager:             txManager,
 		logger:                logger,
 	}
 }
 
+// Exec runs the whole creation (resolving the poster through saving the thread) in one transaction,
+// so a failure leaves neither a new user nor a thread behind.
 func (u *CreateThreadUsecase) Exec(ctx context.Context, cmd CreateThreadCommand) (*CreateThreadOutput, error) {
 	date, err := domainuser.NewUserCreateDate(u.timeGetter.Now(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	poster, err := u.userService.FetchOrCreate(ctx, cmd.IP, date)
-	if err != nil {
-		u.logger.Error(ctx, err)
-		return nil, err
-	}
+	var createdThread *domainthread.Thread
+	fnSucceeded := false
+	err = u.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		poster, err := u.userService.FetchOrCreate(txCtx, cmd.IP, date)
+		if err != nil {
+			u.logger.Error(ctx, err)
+			return err
+		}
 
-	pendingThread, err := domainthread.NewPendingThread(poster.ID(), cmd.Body, cmd.FileID)
-	if err != nil {
-		return nil, toCreateThreadError(err)
-	}
+		pendingThread, err := domainthread.NewPendingThread(poster.ID(), cmd.Body, cmd.FileID)
+		if err != nil {
+			return err
+		}
 
-	createdThread, err := u.threadCreationService.Create(ctx, pendingThread)
+		createdThread, err = u.threadCreationService.Create(txCtx, pendingThread)
+		if err != nil {
+			u.logger.Error(ctx, err)
+			return err
+		}
+
+		fnSucceeded = true
+		return nil
+	})
 	if err != nil {
-		u.logger.Error(ctx, err)
+		// Errors from inside fn were already logged there; only a failure of the transaction itself (e.g. commit) is new.
+		if fnSucceeded {
+			u.logger.Error(ctx, err)
+		}
 		return nil, toCreateThreadError(err)
 	}
 

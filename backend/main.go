@@ -29,13 +29,14 @@ func main() {
 	threadRepository := postgres.NewPostgresThreadRepository(pool, os.Getenv("THREAD_IMAGE_BASE_PATH"))
 	threadFileChecker := postgres.NewPostgresThreadFileChecker(pool)
 	userRepository := postgres.NewPostgresUserRepository(pool)
+	txManager := postgres.NewPostgresTransactionManager(pool)
 	threadCreationService := domainthread.NewThreadCreationService(threadFileChecker, threadRepository)
 	userService := domainuser.NewUserService(userRepository)
 	logger := infralog.NewStdLogger()
 	timeGetter := clock.NewStdTimeGetter()
 
 	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadRepository, logger)
-	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadCreationService, userService, timeGetter, logger)
+	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadCreationService, userService, timeGetter, txManager, logger)
 	listThreadsHandler := thread.NewListThreadsHandler(listThreadsUsecase)
 	createThreadHandler := thread.NewCreateThreadHandler(createThreadUsecase)
 

@@ -30,7 +30,7 @@ func NewPostgresThreadRepository(db querier, baseThreadImagePath string) *Postgr
 }
 
 func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*domainthread.ThreadList, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := querierFrom(ctx, r.db).Query(ctx, `
 		SELECT t.id, t.body, f.name, t.created_at
 		FROM threads t
 		JOIN files f ON f.id = t.file_id
@@ -74,7 +74,7 @@ func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThre
 	var id, fileName string
 	var createdAt time.Time
 
-	err := r.db.QueryRow(ctx, `
+	err := querierFrom(ctx, r.db).QueryRow(ctx, `
 		WITH inserted AS (
 			INSERT INTO threads (user_id, body, file_id) VALUES ($1, $2, $3)
 			RETURNING id, file_id, created_at

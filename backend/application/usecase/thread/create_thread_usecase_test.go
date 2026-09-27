@@ -24,6 +24,7 @@ type createThreadMocks struct {
 	fileChecker *mock_thread.MockIThreadFileChecker
 	threadRepo  *mock_thread.MockIPendingThreadRepository
 	timeGetter  *mock_thread.MockITimeGetter
+	txManager   *mock_thread.MockITransactionManager
 	logger      *mock_thread.MockILogger
 }
 
@@ -35,13 +36,21 @@ func newCreateThreadUsecase(t *testing.T, setupMocks func(createThreadMocks)) *t
 		fileChecker: mock_thread.NewMockIThreadFileChecker(ctrl),
 		threadRepo:  mock_thread.NewMockIPendingThreadRepository(ctrl),
 		timeGetter:  mock_thread.NewMockITimeGetter(ctrl),
+		txManager:   mock_thread.NewMockITransactionManager(ctrl),
 		logger:      mock_thread.NewMockILogger(ctrl),
 	}
 	setupMocks(m)
 
 	userService := domainuser.NewUserService(m.userRepo)
 	threadCreationService := domainthread.NewThreadCreationService(m.fileChecker, m.threadRepo)
-	return thread.NewCreateThreadUsecase(threadCreationService, userService, m.timeGetter, m.logger)
+	return thread.NewCreateThreadUsecase(threadCreationService, userService, m.timeGetter, m.txManager, m.logger)
+}
+
+// stubRunInTxPassThrough makes RunInTx run fn with the ctx it received and return fn's result, as a transaction that commits or rolls back transparently would.
+func stubRunInTxPassThrough(m createThreadMocks) {
+	m.txManager.EXPECT().RunInTx(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+		return fn(ctx)
+	}).AnyTimes()
 }
 
 func TestCreateThreadUsecase_Exec_正常系(t *testing.T) {
@@ -86,7 +95,10 @@ func TestCreateThreadUsecase_Exec_正常系(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := newCreateThreadUsecase(t, tt.setupMocks)
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) {
+				stubRunInTxPassThrough(m)
+				tt.setupMocks(m)
+			})
 
 			got, err := sut.Exec(context.Background(), tt.cmd)
 
@@ -149,7 +161,10 @@ func TestCreateThreadUsecase_Exec_依存に渡す値(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := newCreateThreadUsecase(t, tt.setupMocks)
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) {
+				stubRunInTxPassThrough(m)
+				tt.setupMocks(m)
+			})
 
 			_, err := sut.Exec(context.Background(), tt.cmd)
 
@@ -235,6 +250,7 @@ func TestCreateThreadUsecase_Exec_異常系(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sut := newCreateThreadUsecase(t, func(m createThreadMocks) {
+				stubRunInTxPassThrough(m)
 				m.logger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
 				tt.setupMocks(m)
 			})
@@ -321,7 +337,191 @@ func TestCreateThreadUsecase_Exec_ログ出力(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sut := newCreateThreadUsecase(t, tt.setupMocks)
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) {
+				stubRunInTxPassThrough(m)
+				tt.setupMocks(m)
+			})
+
+			_, err := sut.Exec(context.Background(), tt.cmd)
+
+			require.Error(t, err)
+		})
+	}
+}
+
+type txCtxKey struct{}
+
+type execCtxKey struct{}
+
+func TestCreateThreadUsecase_Exec_トランザクション_依存に渡すcontext(t *testing.T) {
+	ip := "203.0.113.1"
+	now := time.Date(2026, 9, 13, 15, 30, 0, 0, time.UTC)
+	existingUser, _ := domainuser.NewUser("user-1", ip)
+	newUser, _ := domainuser.NewUser("user-2", ip)
+	createdThread, _ := domainthread.NewThread("thread-1", "hello", mustFilePath(t), now)
+	execCtx := context.WithValue(context.Background(), execCtxKey{}, "exec")
+	txCtx := context.WithValue(context.Background(), txCtxKey{}, "tx")
+
+	tests := []struct {
+		name       string
+		cmd        thread.CreateThreadCommand
+		setupMocks func(createThreadMocks)
+	}{
+		{
+			name: "FindByIPAndDateに、RunInTxがfnに渡したcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(txCtx, gomock.Any(), gomock.Any()).Return(existingUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+			},
+		},
+		{
+			name: "同一IP・同一日のUserが存在しないとき、CreateUserに、RunInTxがfnに渡したcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
+				m.userRepo.EXPECT().CreateUser(txCtx, gomock.Any()).Return(newUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+			},
+		},
+		{
+			name: "ExistsFileに、RunInTxがfnに渡したcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(txCtx, gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+			},
+		},
+		{
+			name: "IsFileAttachedToThreadに、RunInTxがfnに渡したcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(txCtx, gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+			},
+		},
+		{
+			name: "CreateThreadに、RunInTxがfnに渡したcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(txCtx, gomock.Any()).Return(createdThread, nil)
+			},
+		},
+		{
+			name: "ITimeGetter.Nowに、RunInTxがfnに渡すcontextではなく、Execが受け取った元のcontextが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
+			setupMocks: func(m createThreadMocks) {
+				m.timeGetter.EXPECT().Now(execCtx).Return(now)
+				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
+				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+				m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+				m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) {
+				m.txManager.EXPECT().RunInTx(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, fn func(context.Context) error) error {
+					return fn(txCtx)
+				})
+				tt.setupMocks(m)
+			})
+
+			_, err := sut.Exec(execCtx, tt.cmd)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+// stubCommitFailure makes every dependency succeed and RunInTx run fn, then fail as a commit would.
+func stubCommitFailure(t *testing.T, m createThreadMocks, errCommit error) {
+	t.Helper()
+	now := time.Date(2026, 9, 13, 15, 30, 0, 0, time.UTC)
+	existingUser, _ := domainuser.NewUser("user-1", "203.0.113.1")
+	createdThread, _ := domainthread.NewThread("thread-1", "hello", mustFilePath(t), now)
+
+	m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
+	m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
+	m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(true, nil)
+	m.fileChecker.EXPECT().IsFileAttachedToThread(gomock.Any(), gomock.Any()).Return(false, nil)
+	m.threadRepo.EXPECT().CreateThread(gomock.Any(), gomock.Any()).Return(createdThread, nil)
+	m.txManager.EXPECT().RunInTx(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, fn func(context.Context) error) error {
+		_ = fn(ctx)
+		return errCommit
+	})
+}
+
+func TestCreateThreadUsecase_Exec_トランザクション_コミット失敗(t *testing.T) {
+	errCommitFailed := errors.New("commit failed")
+
+	tests := []struct {
+		name       string
+		cmd        thread.CreateThreadCommand
+		setupMocks func(*testing.T, createThreadMocks)
+		wantErr    error
+	}{
+		{
+			name: "fnが成功したあとRunInTxがエラー(コミット失敗など)を返したとき、そのエラーが返ること",
+			cmd:  thread.CreateThreadCommand{IP: "203.0.113.1", Body: "hello", FileID: "file-1"},
+			setupMocks: func(t *testing.T, m createThreadMocks) {
+				stubCommitFailure(t, m, errCommitFailed)
+				m.logger.EXPECT().Error(gomock.Any(), gomock.Any()).AnyTimes()
+			},
+			wantErr: errCommitFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) { tt.setupMocks(t, m) })
+
+			_, err := sut.Exec(context.Background(), tt.cmd)
+
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestCreateThreadUsecase_Exec_トランザクション_コミット失敗_ログ出力(t *testing.T) {
+	errCommitFailed := errors.New("commit failed")
+
+	tests := []struct {
+		name       string
+		cmd        thread.CreateThreadCommand
+		setupMocks func(*testing.T, createThreadMocks)
+	}{
+		{
+			name: "fnが成功したあとRunInTxがエラー(コミット失敗など)を返したとき、ILoggerにそのエラーが渡されること",
+			cmd:  thread.CreateThreadCommand{IP: "203.0.113.1", Body: "hello", FileID: "file-1"},
+			setupMocks: func(t *testing.T, m createThreadMocks) {
+				stubCommitFailure(t, m, errCommitFailed)
+				m.logger.EXPECT().Error(gomock.Any(), errCommitFailed).Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sut := newCreateThreadUsecase(t, func(m createThreadMocks) { tt.setupMocks(t, m) })
 
 			_, err := sut.Exec(context.Background(), tt.cmd)
 
