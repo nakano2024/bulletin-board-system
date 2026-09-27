@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     user_id TEXT NOT NULL,
     body TEXT NOT NULL,
-    file_name TEXT,
+    -- A thread references its image through files; one file belongs to at most one thread.
+    file_id TEXT NOT NULL CONSTRAINT threads_file_id_fkey REFERENCES files (id) CONSTRAINT threads_file_id_key UNIQUE,
     is_alive BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

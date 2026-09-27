@@ -10,76 +10,72 @@ import (
 )
 
 func TestNewPendingThread_正常系(t *testing.T) {
-	fileName, _ := thread.NewFileName("sample.png")
-
 	tests := []struct {
-		name     string
-		userID   string
-		body     string
-		fileName *thread.FileName
+		name   string
+		userID string
+		body   string
+		fileID string
 	}{
 		{
-			name:     "userID・body・fileName(拡張子.png)が正常な値のとき、PendingThreadが生成されること",
-			userID:   "user-1",
-			body:     "hello",
-			fileName: fileName,
+			name:   "userID・body・fileIDがいずれも正常な値のとき、それぞれの値を保持したPendingThreadが生成されること",
+			userID: "user-1",
+			body:   "hello",
+			fileID: "file-1",
 		},
 		{
-			name:     "userIDとbodyがともに1文字のとき、PendingThreadが生成されること",
-			userID:   "u",
-			body:     "a",
-			fileName: fileName,
+			name:   "userID・body・fileIDがいずれも1文字のとき、それぞれの値を保持したPendingThreadが生成されること",
+			userID: "u",
+			body:   "a",
+			fileID: "f",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := thread.NewPendingThread(tt.userID, tt.body, tt.fileName)
+			got, err := thread.NewPendingThread(tt.userID, tt.body, tt.fileID)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.userID, got.UserID())
 			assert.Equal(t, tt.body, got.Body())
-			assert.Equal(t, tt.fileName, got.FileName())
+			assert.Equal(t, tt.fileID, got.FileID())
 		})
 	}
 }
 
 func TestNewPendingThread_異常系(t *testing.T) {
-	pngFileName, _ := thread.NewFileName("sample.png")
-
 	tests := []struct {
-		name     string
-		userID   string
-		body     string
-		fileName *thread.FileName
-		wantErr  error
+		name    string
+		userID  string
+		body    string
+		fileID  string
+		wantErr error
 	}{
 		{
-			name:     "userIDが空文字のとき、ErrPendingThreadUserIDEmptyが返ること",
-			userID:   "",
-			body:     "hello",
-			fileName: pngFileName,
-			wantErr:  thread.ErrPendingThreadUserIDEmpty,
+			name:    "userIDが空文字のとき、ErrPendingThreadUserIDEmptyが返ること",
+			userID:  "",
+			body:    "hello",
+			fileID:  "file-1",
+			wantErr: thread.ErrPendingThreadUserIDEmpty,
 		},
 		{
-			name:     "bodyが空文字のとき、ErrPendingThreadBodyEmptyが返ること",
-			userID:   "user-1",
-			body:     "",
-			fileName: pngFileName,
-			wantErr:  thread.ErrPendingThreadBodyEmpty,
+			name:    "bodyが空文字のとき、ErrPendingThreadBodyEmptyが返ること",
+			userID:  "user-1",
+			body:    "",
+			fileID:  "file-1",
+			wantErr: thread.ErrPendingThreadBodyEmpty,
 		},
 		{
-			name:     "fileNameがnilのとき、ErrPendingThreadFileNameMissingが返ること",
-			userID:   "user-1",
-			body:     "hello",
-			fileName: nil,
-			wantErr:  thread.ErrPendingThreadFileNameMissing,
+			name:    "fileIDが空文字のとき、ErrPendingThreadFileIDEmptyが返ること",
+			userID:  "user-1",
+			body:    "hello",
+			fileID:  "",
+			wantErr: thread.ErrPendingThreadFileIDEmpty,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := thread.NewPendingThread(tt.userID, tt.body, tt.fileName)
+			_, err := thread.NewPendingThread(tt.userID, tt.body, tt.fileID)
 
 			require.ErrorIs(t, err, tt.wantErr)
 		})

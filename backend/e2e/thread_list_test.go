@@ -31,12 +31,15 @@ func TestE2E_GetThreads_正常系(t *testing.T) {
 	t.Cleanup(pool.Close)
 
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	_, err = pool.Exec(ctx, "INSERT INTO files (id, name, content_type, size_bytes) VALUES ($1, $2, $3, $4)", "file-e2e-list", "sample.png", "image/png", 1024)
+	require.NoError(t, err)
 	_, err = pool.Exec(ctx,
-		"INSERT INTO threads (id, user_id, body, file_name, is_alive, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-		"thread-1", "user-1", "hello e2e", "sample.png", true, fixedTime)
+		"INSERT INTO threads (id, user_id, body, file_id, is_alive, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+		"thread-1", "user-1", "hello e2e", "file-e2e-list", true, fixedTime)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), "DELETE FROM threads WHERE id = $1", "thread-1")
+		_, _ = pool.Exec(context.Background(), "DELETE FROM files WHERE id = $1", "file-e2e-list")
 	})
 
 	threadRepository := postgres.NewPostgresThreadRepository(pool, "thread_images/")
