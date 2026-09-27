@@ -64,8 +64,10 @@ func (h *CreateThreadHandler) toErrorResponse(c echo.Context, err error) error {
 	switch {
 	case errors.Is(err, applicationthread.ErrInvalidBody):
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "本文を入力してください。"})
-	case errors.Is(err, applicationthread.ErrInvalidFile):
+	case errors.Is(err, applicationthread.ErrFileRequired):
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "画像ファイルを添付してください。"})
+	case errors.Is(err, applicationthread.ErrFileNotFound):
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "存在するファイルを指定してください。"})
 	case errors.Is(err, applicationthread.ErrFileAlreadyUsed):
 		return c.JSON(http.StatusBadRequest, map[string]string{"message": "この画像ファイルは既に使用されています。"})
 	default:

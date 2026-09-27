@@ -2,7 +2,6 @@ package postgres_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -15,142 +14,27 @@ import (
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"
 )
 
-// In the RunInTx tests the manager is given the test transaction, so RunInTx opens a savepoint inside it;
-// the test transaction is rolled back at cleanup either way.
+// savepointBeginner lets PostgresTransactionManager begin on the test transaction: pgx.Tx has no BeginTx, so BeginTx
+// opens a savepoint via Begin. The test transaction is rolled back at cleanup either way.
+type savepointBeginner struct{ pgx.Tx }
 
-func countUsersByIP(t *testing.T, tx pgx.Tx, ip string) int {
+func (b savepointBeginner) BeginTx(ctx context.Context, _ pgx.TxOptions) (pgx.Tx, error) {
+	return b.Begin(ctx)
+}
+
+// runInTestTx runs fn through RunInTx on testTx, so the ctx fn receives carries a transaction nested in testTx.
+func runInTestTx(t *testing.T, testTx pgx.Tx, fn func(txCtx context.Context)) {
 	t.Helper()
-	var n int
-	require.NoError(t, tx.QueryRow(context.Background(), "SELECT count(*) FROM users WHERE ip = $1", ip).Scan(&n))
-	return n
+	sut := postgres.NewPostgresTransactionManager(savepointBeginner{testTx})
+	require.NoError(t, sut.RunInTx(context.Background(), func(txCtx context.Context) error {
+		fn(txCtx)
+		return nil
+	}))
 }
 
-func TestPostgresTransactionManager_RunInTx_正常系_コミット(t *testing.T) {
-	pool := newTestPool(t)
-	date := mustUserCreateDate(t, time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC))
-
-	tests := []struct {
-		name          string
-		ip            string
-		wantUserCount int
-	}{
-		{
-			name:          "fnがnilを返したとき、fn内でCreateUserが書き込んだusersの行が、RunInTxの後も残っていること",
-			ip:            "203.0.113.10",
-			wantUserCount: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			testTx := beginTx(t, pool)
-			userRepo := postgres.NewPostgresUserRepository(pool)
-
-			sut := postgres.NewPostgresTransactionManager(testTx)
-			err := sut.RunInTx(ctx, func(txCtx context.Context) error {
-				_, err := userRepo.CreateUser(txCtx, mustNewPendingUser(t, tt.ip, date))
-				return err
-			})
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.wantUserCount, countUsersByIP(t, testTx, tt.ip))
-		})
-	}
-}
-
-func TestPostgresTransactionManager_RunInTx_異常系_ロールバック(t *testing.T) {
-	pool := newTestPool(t)
-	date := mustUserCreateDate(t, time.Date(2026, 9, 27, 0, 0, 0, 0, time.UTC))
-
-	tests := []struct {
-		name          string
-		ip            string
-		fnErr         error
-		wantUserCount int
-	}{
-		{
-			name:          "fnがエラーを返したとき、fn内でCreateUserが書き込んだusersの行が、RunInTxの後に残っていないこと",
-			ip:            "203.0.113.11",
-			fnErr:         errors.New("fn failed"),
-			wantUserCount: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
-			testTx := beginTx(t, pool)
-			userRepo := postgres.NewPostgresUserRepository(pool)
-
-			sut := postgres.NewPostgresTransactionManager(testTx)
-			_ = sut.RunInTx(ctx, func(txCtx context.Context) error {
-				_, err := userRepo.CreateUser(txCtx, mustNewPendingUser(t, tt.ip, date))
-				require.NoError(t, err)
-				return tt.fnErr
-			})
-
-			assert.Equal(t, tt.wantUserCount, countUsersByIP(t, testTx, tt.ip))
-		})
-	}
-}
-
-func TestPostgresTransactionManager_RunInTx_正常系_戻り値(t *testing.T) {
-	pool := newTestPool(t)
-
-	tests := []struct {
-		name  string
-		fnErr error
-	}{
-		{
-			name:  "fnがnilを返したとき、RunInTxがnilを返すこと",
-			fnErr: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			testTx := beginTx(t, pool)
-
-			sut := postgres.NewPostgresTransactionManager(testTx)
-			err := sut.RunInTx(context.Background(), func(context.Context) error { return tt.fnErr })
-
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestPostgresTransactionManager_RunInTx_異常系_戻り値(t *testing.T) {
-	pool := newTestPool(t)
-	errFn := errors.New("fn failed")
-
-	tests := []struct {
-		name    string
-		fnErr   error
-		wantErr error
-	}{
-		{
-			name:    "fnがエラーを返したとき、RunInTxがそのエラーを返すこと",
-			fnErr:   errFn,
-			wantErr: errFn,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			testTx := beginTx(t, pool)
-
-			sut := postgres.NewPostgresTransactionManager(testTx)
-			err := sut.RunInTx(context.Background(), func(context.Context) error { return tt.fnErr })
-
-			require.ErrorIs(t, err, tt.wantErr)
-		})
-	}
-}
-
-// The tests below build each repository on the pool but pass a ctx carrying the test transaction. Data seeded only
-// inside that (uncommitted) transaction is invisible to the pool, so reading it — or writing so that the pool cannot
-// see the row — shows the repository used the transaction from ctx.
+// The tests below build each repository on the pool but call it with the ctx that RunInTx passes to fn. Data seeded
+// only inside the (uncommitted) test transaction is invisible to the pool, so reading it — or writing so that the pool
+// cannot see the row — shows the repository used the transaction from ctx.
 
 func TestPostgresUserRepository_FindByIPAndDate_ctxのトランザクション(t *testing.T) {
 	pool := newTestPool(t)
@@ -163,7 +47,7 @@ func TestPostgresUserRepository_FindByIPAndDate_ctxのトランザクション(t
 		want   *domainuser.User
 	}{
 		{
-			name:   "ctxのトランザクション内でだけ投入したusersの行が、Userとして返ること",
+			name:   "RunInTxのfnに渡されたctxで呼んだとき、そのトランザクション内でだけ投入したusersの行が、Userとして返ること",
 			seedID: "user-tx",
 			ip:     "203.0.113.20",
 			want:   mustNewUser(t, "user-tx", "203.0.113.20"),
@@ -178,7 +62,10 @@ func TestPostgresUserRepository_FindByIPAndDate_ctxのトランザクション(t
 			require.NoError(t, err)
 
 			sut := postgres.NewPostgresUserRepository(pool)
-			got, err := sut.FindByIPAndDate(postgres.WithTx(ctx, testTx), tt.ip, date)
+			var got *domainuser.User
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				got, err = sut.FindByIPAndDate(txCtx, tt.ip, date)
+			})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -196,7 +83,7 @@ func TestPostgresUserRepository_CreateUser_ctxのトランザクション(t *tes
 		wantCountFromPool int
 	}{
 		{
-			name:              "書き込んだusersの行が、ctxのトランザクションの外(プール)からは見えないこと",
+			name:              "RunInTxのfnに渡されたctxで呼んだとき、書き込んだusersの行が、そのトランザクションの外(プール)からは見えないこと",
 			ip:                "203.0.113.21",
 			wantCountFromPool: 0,
 		},
@@ -208,7 +95,10 @@ func TestPostgresUserRepository_CreateUser_ctxのトランザクション(t *tes
 			testTx := beginTx(t, pool)
 
 			sut := postgres.NewPostgresUserRepository(pool)
-			_, err := sut.CreateUser(postgres.WithTx(ctx, testTx), mustNewPendingUser(t, tt.ip, date))
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				_, err = sut.CreateUser(txCtx, mustNewPendingUser(t, tt.ip, date))
+			})
 			require.NoError(t, err)
 
 			var countFromPool int
@@ -228,7 +118,7 @@ func TestPostgresThreadFileChecker_ExistsFile_ctxのトランザクション(t *
 		want      bool
 	}{
 		{
-			name:      "ctxのトランザクション内でだけ投入したfilesのfile_idを渡したとき、trueが返ること",
+			name:      "RunInTxのfnに渡されたctxで、そのトランザクション内でだけ投入したfilesのfile_idを渡したとき、trueが返ること",
 			seedFiles: []seedFile{{id: "file-tx", name: "sample.png"}},
 			fileID:    "file-tx",
 			want:      true,
@@ -237,12 +127,15 @@ func TestPostgresThreadFileChecker_ExistsFile_ctxのトランザクション(t *
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			testTx := beginTx(t, pool)
 			seedFilesAndThreads(t, testTx, tt.seedFiles, nil)
 
 			sut := postgres.NewPostgresThreadFileChecker(pool)
-			got, err := sut.ExistsFile(postgres.WithTx(ctx, testTx), tt.fileID)
+			var got bool
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				got, err = sut.ExistsFile(txCtx, tt.fileID)
+			})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -262,7 +155,7 @@ func TestPostgresThreadFileChecker_IsFileAttachedToThread_ctxのトランザク�
 		want        bool
 	}{
 		{
-			name:        "ctxのトランザクション内でだけ投入したthreadsが参照するfile_idを渡したとき、trueが返ること",
+			name:        "RunInTxのfnに渡されたctxで、そのトランザクション内でだけ投入したthreadsが参照するfile_idを渡したとき、trueが返ること",
 			seedFiles:   []seedFile{{id: "file-tx", name: "sample.png"}},
 			seedThreads: []seedThread{{id: "thread-tx", body: "hello", fileID: "file-tx", isAlive: true, createdAt: fixedTime}},
 			fileID:      "file-tx",
@@ -272,12 +165,15 @@ func TestPostgresThreadFileChecker_IsFileAttachedToThread_ctxのトランザク�
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			testTx := beginTx(t, pool)
 			seedFilesAndThreads(t, testTx, tt.seedFiles, tt.seedThreads)
 
 			sut := postgres.NewPostgresThreadFileChecker(pool)
-			got, err := sut.IsFileAttachedToThread(postgres.WithTx(ctx, testTx), tt.fileID)
+			var got bool
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				got, err = sut.IsFileAttachedToThread(txCtx, tt.fileID)
+			})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
@@ -294,7 +190,7 @@ func TestPostgresThreadRepository_CreateThread_ctxのトランザクション(t 
 		pendingThread *domainthread.PendingThread
 	}{
 		{
-			name:          "ctxのトランザクション内でだけ投入したfilesを参照するPendingThreadを渡したとき、エラーなくThreadが作成されること",
+			name:          "RunInTxのfnに渡されたctxで、そのトランザクション内でだけ投入したfilesを参照するPendingThreadを渡したとき、エラーなくThreadが作成されること",
 			seedFiles:     []seedFile{{id: "file-tx", name: "sample.png"}},
 			pendingThread: mustNewPendingThread(t, "user-1", "hello", "file-tx"),
 		},
@@ -302,12 +198,14 @@ func TestPostgresThreadRepository_CreateThread_ctxのトランザクション(t 
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			testTx := beginTx(t, pool)
 			seedFilesAndThreads(t, testTx, tt.seedFiles, nil)
 
 			sut := postgres.NewPostgresThreadRepository(pool, "thread_images/")
-			_, err := sut.CreateThread(postgres.WithTx(ctx, testTx), tt.pendingThread)
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				_, err = sut.CreateThread(txCtx, tt.pendingThread)
+			})
 
 			require.NoError(t, err)
 		})
@@ -326,7 +224,7 @@ func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_ctxのトラ�
 		want        []*domainthread.Thread
 	}{
 		{
-			name:        "ctxのトランザクション内でだけ投入したスレッドが、ThreadListに含まれること",
+			name:        "RunInTxのfnに渡されたctxで呼んだとき、そのトランザクション内でだけ投入したスレッドが、ThreadListに含まれること",
 			seedFiles:   []seedFile{{id: "file-tx", name: "sample.png"}},
 			seedThreads: []seedThread{{id: "thread-tx", body: "hello", fileID: "file-tx", isAlive: true, createdAt: fixedTime}},
 			want:        []*domainthread.Thread{threadInTx},
@@ -335,12 +233,15 @@ func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_ctxのトラ�
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := context.Background()
 			testTx := beginTx(t, pool)
 			seedFilesAndThreads(t, testTx, tt.seedFiles, tt.seedThreads)
 
 			sut := postgres.NewPostgresThreadRepository(pool, "thread_images/")
-			got, err := sut.FetchActiveThreadListNewestFirst(postgres.WithTx(ctx, testTx))
+			var got *domainthread.ThreadList
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				got, err = sut.FetchActiveThreadListNewestFirst(txCtx)
+			})
 
 			require.NoError(t, err)
 			assert.Equal(t, normalizeThreads(tt.want), normalizeThreads(got.Threads()))

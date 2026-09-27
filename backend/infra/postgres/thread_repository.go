@@ -5,18 +5,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
-// querier is satisfied by both *pgxpool.Pool and pgx.Tx, so tests can run
-// FetchActiveThreadListNewestFirst/CreateThread inside a transaction for isolation.
-type querier interface {
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
+// querier is satisfied by both *pgxpool.Pool and pgx.Tx, so tests can run the repositories inside a transaction
+// for isolation. It is trmpgx.Tr so that trmpgx.DefaultCtxGetter can swap in the transaction carried in ctx.
+type querier = trmpgx.Tr
 
 type PostgresThreadRepository struct {
 	db                  querier
@@ -30,7 +27,7 @@ func NewPostgresThreadRepository(db querier, baseThreadImagePath string) *Postgr
 }
 
 func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*domainthread.ThreadList, error) {
-	rows, err := querierFrom(ctx, r.db).Query(ctx, `
+	rows, err := trmpgx.DefaultCtxGetter.DefaultTrOrDB(ctx, r.db).Query(ctx, `
 		SELECT t.id, t.body, f.name, t.created_at
 		FROM threads t
 		JOIN files f ON f.id = t.file_id
@@ -74,7 +71,7 @@ func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThre
 	var id, fileName string
 	var createdAt time.Time
 
-	err := querierFrom(ctx, r.db).QueryRow(ctx, `
+	err := trmpgx.DefaultCtxGetter.DefaultTrOrDB(ctx, r.db).QueryRow(ctx, `
 		WITH inserted AS (
 			INSERT INTO threads (user_id, body, file_id) VALUES ($1, $2, $3)
 			RETURNING id, file_id, created_at

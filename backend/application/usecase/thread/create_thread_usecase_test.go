@@ -186,14 +186,14 @@ func TestCreateThreadUsecase_Exec_異常系(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name: "ファイルが存在しないとき、applicationのErrInvalidFileが返ること",
+			name: "ファイルが存在しないとき、applicationのErrFileNotFoundが返ること",
 			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: "file-1"},
 			setupMocks: func(m createThreadMocks) {
 				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
 				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
 				m.fileChecker.EXPECT().ExistsFile(gomock.Any(), gomock.Any()).Return(false, nil)
 			},
-			wantErr: thread.ErrInvalidFile,
+			wantErr: thread.ErrFileNotFound,
 		},
 		{
 			name: "ファイルが他スレッドで使用済みのとき、applicationのErrFileAlreadyUsedが返ること",
@@ -237,13 +237,13 @@ func TestCreateThreadUsecase_Exec_異常系(t *testing.T) {
 			wantErr: thread.ErrInvalidBody,
 		},
 		{
-			name: "CommandのFileIDが空文字のとき、applicationのErrInvalidFileが返ること",
+			name: "CommandのFileIDが空文字のとき、applicationのErrFileRequiredが返ること",
 			cmd:  thread.CreateThreadCommand{IP: ip, Body: "hello", FileID: ""},
 			setupMocks: func(m createThreadMocks) {
 				m.timeGetter.EXPECT().Now(gomock.Any()).Return(now)
 				m.userRepo.EXPECT().FindByIPAndDate(gomock.Any(), gomock.Any(), gomock.Any()).Return(existingUser, nil)
 			},
-			wantErr: thread.ErrInvalidFile,
+			wantErr: thread.ErrFileRequired,
 		},
 	}
 
