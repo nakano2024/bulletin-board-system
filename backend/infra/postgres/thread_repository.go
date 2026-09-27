@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
@@ -22,13 +24,18 @@ type PostgresThreadRepository struct {
 }
 
 // NewPostgresThreadRepository takes baseThreadImagePath (the deployment-level storage prefix for thread images, e.g. from an env var)
-// used to reconstruct each Thread's FilePath from the DB's file_name column.
+// used to reconstruct each Thread's FilePath from files.name.
 func NewPostgresThreadRepository(db querier, baseThreadImagePath string) *PostgresThreadRepository {
 	return &PostgresThreadRepository{db: db, baseThreadImagePath: baseThreadImagePath}
 }
 
 func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.Context) (*domainthread.ThreadList, error) {
-	rows, err := r.db.Query(ctx, "SELECT id, body, file_name, created_at FROM threads WHERE is_alive = true ORDER BY created_at DESC")
+	rows, err := querierFrom(ctx, r.db).Query(ctx, `
+		SELECT t.id, t.body, f.name, t.created_at
+		FROM threads t
+		JOIN files f ON f.id = t.file_id
+		WHERE t.is_alive = true
+		ORDER BY t.created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -36,14 +43,13 @@ func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.
 
 	threads := make([]*domainthread.Thread, 0)
 	for rows.Next() {
-		var id, body string
-		var fileName *string
+		var id, body, fileName string
 		var createdAt time.Time
 		if err := rows.Scan(&id, &body, &fileName, &createdAt); err != nil {
 			return nil, err
 		}
 
-		filePath, err := r.filePathFromFileName(fileName)
+		filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, fileName)
 		if err != nil {
 			return nil, err
 		}
@@ -62,20 +68,27 @@ func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.
 	return domainthread.NewThreadList(threads), nil
 }
 
+// CreateThread translates the threads.file_id FK / UNIQUE violations into ErrFileNotFound / ErrFileAlreadyUsed
+// for requests that slip past ThreadCreationService's checks concurrently.
 func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThread *domainthread.PendingThread) (*domainthread.Thread, error) {
-	var id string
+	var id, fileName string
 	var createdAt time.Time
 
-	err := r.db.QueryRow(
-		ctx,
-		"INSERT INTO threads (user_id, body, file_name) VALUES ($1, $2, $3) RETURNING id, created_at",
-		pendingThread.UserID(), pendingThread.Body(), pendingThread.FileName().Value(),
-	).Scan(&id, &createdAt)
+	err := querierFrom(ctx, r.db).QueryRow(ctx, `
+		WITH inserted AS (
+			INSERT INTO threads (user_id, body, file_id) VALUES ($1, $2, $3)
+			RETURNING id, file_id, created_at
+		)
+		SELECT i.id, f.name, i.created_at
+		FROM inserted i
+		JOIN files f ON f.id = i.file_id`,
+		pendingThread.UserID(), pendingThread.Body(), pendingThread.FileID(),
+	).Scan(&id, &fileName, &createdAt)
 	if err != nil {
-		return nil, err
+		return nil, toFileConstraintError(err)
 	}
 
-	filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, pendingThread.FileName().Value())
+	filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -83,9 +96,20 @@ func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThre
 	return domainthread.NewThread(id, pendingThread.Body(), filePath, createdAt)
 }
 
-func (r *PostgresThreadRepository) filePathFromFileName(fileName *string) (*domainthread.FilePath, error) {
-	if fileName == nil {
-		return nil, nil
+// toFileConstraintError maps violations of the threads.file_id constraints to the domain's sentinel errors;
+// any other error is returned unchanged.
+func toFileConstraintError(err error) error {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return err
 	}
-	return domainthread.NewFilePath(r.baseThreadImagePath, *fileName)
+
+	switch pgErr.ConstraintName {
+	case "threads_file_id_fkey":
+		return errors.Join(domainthread.ErrFileNotFound, err)
+	case "threads_file_id_key":
+		return errors.Join(domainthread.ErrFileAlreadyUsed, err)
+	default:
+		return err
+	}
 }
