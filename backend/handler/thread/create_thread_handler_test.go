@@ -123,13 +123,22 @@ func TestCreateThreadHandler_CreateThread_異常系(t *testing.T) {
 			wantBody:   `{"message":"本文を入力してください。"}` + "\n",
 		},
 		{
-			name: "UsecaseがErrInvalidFileを返すとき、ステータス400かつ「画像ファイルを添付してください。」が返ること",
+			name: "UsecaseがErrFileRequiredを返すとき、ステータス400かつ「画像ファイルを添付してください。」が返ること",
 			body: validCreateThreadRequestBody,
 			setupMock: func(m *mock_thread.MockcreateThreadUsecase) {
-				m.EXPECT().Exec(gomock.Any(), gomock.Any()).Return(nil, applicationthread.ErrInvalidFile)
+				m.EXPECT().Exec(gomock.Any(), gomock.Any()).Return(nil, applicationthread.ErrFileRequired)
 			},
 			wantStatus: http.StatusBadRequest,
 			wantBody:   `{"message":"画像ファイルを添付してください。"}` + "\n",
+		},
+		{
+			name: "UsecaseがErrFileNotFoundを返すとき、ステータス400かつ「存在するファイルを指定してください。」が返ること",
+			body: validCreateThreadRequestBody,
+			setupMock: func(m *mock_thread.MockcreateThreadUsecase) {
+				m.EXPECT().Exec(gomock.Any(), gomock.Any()).Return(nil, applicationthread.ErrFileNotFound)
+			},
+			wantStatus: http.StatusBadRequest,
+			wantBody:   `{"message":"存在するファイルを指定してください。"}` + "\n",
 		},
 		{
 			name: "UsecaseがErrFileAlreadyUsedを返すとき、ステータス400かつ「この画像ファイルは既に使用されています。」が返ること",

@@ -91,8 +91,10 @@ func toCreateThreadError(err error) error {
 	switch {
 	case errors.Is(err, domainthread.ErrPendingThreadBodyEmpty):
 		return fmt.Errorf("%w: %w", ErrInvalidBody, err)
-	case errors.Is(err, domainthread.ErrPendingThreadFileIDEmpty), errors.Is(err, domainthread.ErrFileNotFound):
-		return fmt.Errorf("%w: %w", ErrInvalidFile, err)
+	case errors.Is(err, domainthread.ErrPendingThreadFileIDEmpty):
+		return fmt.Errorf("%w: %w", ErrFileRequired, err)
+	case errors.Is(err, domainthread.ErrFileNotFound):
+		return fmt.Errorf("%w: %w", ErrFileNotFound, err)
 	case errors.Is(err, domainthread.ErrFileAlreadyUsed):
 		return fmt.Errorf("%w: %w", ErrFileAlreadyUsed, err)
 	default:
