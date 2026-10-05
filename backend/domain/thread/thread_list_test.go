@@ -7,12 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
 func TestNewThreadList(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	filePath, err := thread.NewFilePath("images/", "sample.png")
+	filePath, err := image_file.NewFilePath("images/", "sample.png")
 	require.NoError(t, err)
 	th, err := thread.NewThread("thread-1", "hello", filePath, fixedTime)
 	require.NoError(t, err)

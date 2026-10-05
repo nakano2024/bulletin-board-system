@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/postgres"
 )
@@ -271,9 +272,9 @@ func seedFilesAndThreads(t *testing.T, tx pgx.Tx, files []seedFile, threads []se
 	}
 }
 
-func mustFilePath(t *testing.T, fileName string) *domainthread.FilePath {
+func mustFilePath(t *testing.T, fileName string) *image_file.FilePath {
 	t.Helper()
-	fp, err := domainthread.NewFilePath("thread_images/", fileName)
+	fp, err := image_file.NewFilePath("thread_images/", fileName)
 	require.NoError(t, err)
 	return fp
 }

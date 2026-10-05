@@ -1,4 +1,4 @@
-package thread
+package image_file
 
 import (
 	"errors"

@@ -1,4 +1,4 @@
-package thread_test
+package image_file_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 )
 
 func TestNewFilePath_正常系(t *testing.T) {
@@ -32,7 +32,7 @@ func TestNewFilePath_正常系(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := thread.NewFilePath(tt.basePath, tt.fileName)
+			got, err := image_file.NewFilePath(tt.basePath, tt.fileName)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantValue, got.Value())
@@ -51,37 +51,37 @@ func TestNewFilePath_異常系(t *testing.T) {
 			name:     "basePathが空文字のとき、ErrFilePathBasePathInvalidが返ること",
 			basePath: "",
 			fileName: "sample.png",
-			wantErr:  thread.ErrFilePathBasePathInvalid,
+			wantErr:  image_file.ErrFilePathBasePathInvalid,
 		},
 		{
 			name:     "basePathが\"/\"のみ(半角英数字0文字)のとき、ErrFilePathBasePathInvalidが返ること",
 			basePath: "/",
 			fileName: "sample.png",
-			wantErr:  thread.ErrFilePathBasePathInvalid,
+			wantErr:  image_file.ErrFilePathBasePathInvalid,
 		},
 		{
 			name:     "basePathが\"/\"で終わっていないとき、ErrFilePathBasePathInvalidが返ること",
 			basePath: "images",
 			fileName: "sample.png",
-			wantErr:  thread.ErrFilePathBasePathInvalid,
+			wantErr:  image_file.ErrFilePathBasePathInvalid,
 		},
 		{
 			name:     "basePathに半角英数字・\"/\"以外の文字が含まれるとき、ErrFilePathBasePathInvalidが返ること",
 			basePath: "images-1/",
 			fileName: "sample.png",
-			wantErr:  thread.ErrFilePathBasePathInvalid,
+			wantErr:  image_file.ErrFilePathBasePathInvalid,
 		},
 		{
 			name:     "fileNameの形式が不正なとき、ErrFileNameInvalidが返ること(FileNameへ委譲されていること)",
 			basePath: "images/",
 			fileName: "sample@1.png",
-			wantErr:  thread.ErrFileNameInvalid,
+			wantErr:  image_file.ErrFileNameInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := thread.NewFilePath(tt.basePath, tt.fileName)
+			_, err := image_file.NewFilePath(tt.basePath, tt.fileName)
 
 			require.ErrorIs(t, err, tt.wantErr)
 		})

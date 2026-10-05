@@ -12,6 +12,7 @@ import (
 
 	"github.com/nakanokota/bulletin-board-system/backend/application/mock/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
@@ -19,7 +20,7 @@ func TestListThreadsUsecase_Exec_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	imagePath := "images/thread1.png"
 
-	filePath, _ := domainthread.NewFilePath("images/", "thread1.png")
+	filePath, _ := image_file.NewFilePath("images/", "thread1.png")
 	threadWithImage, _ := domainthread.NewThread("thread-1", "hello", filePath, fixedTime)
 	secondThreadWithImage, _ := domainthread.NewThread("thread-2", "second", filePath, fixedTime.Add(time.Minute))
 

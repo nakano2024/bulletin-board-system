@@ -10,13 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/domain/thread/mock_thread"
 )
 
 func TestThreadCreationService_Create_正常系(t *testing.T) {
 	pendingThread, _ := thread.NewPendingThread("user-1", "hello", "file-1")
-	filePath, _ := thread.NewFilePath("thread_images/", "sample.png")
+	filePath, _ := image_file.NewFilePath("thread_images/", "sample.png")
 	createdThread, _ := thread.NewThread("thread-1", "hello", filePath, time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC))
 
 	tests := []struct {
@@ -53,7 +54,7 @@ func TestThreadCreationService_Create_正常系(t *testing.T) {
 
 func TestThreadCreationService_Create_依存に渡す値(t *testing.T) {
 	pendingThread, _ := thread.NewPendingThread("user-1", "hello", "file-1")
-	filePath, _ := thread.NewFilePath("thread_images/", "sample.png")
+	filePath, _ := image_file.NewFilePath("thread_images/", "sample.png")
 	createdThread, _ := thread.NewThread("thread-1", "hello", filePath, time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC))
 
 	tests := []struct {
