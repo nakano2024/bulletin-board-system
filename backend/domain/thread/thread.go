@@ -3,6 +3,8 @@ package thread
 import (
 	"errors"
 	"time"
+
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 )
 
 var (
@@ -15,12 +17,12 @@ var (
 type Thread struct {
 	id        string
 	body      string
-	filePath  *FilePath
+	filePath  *image_file.FilePath
 	createdAt time.Time
 }
 
 // NewThread reconstructs a Thread, validating its invariants. filePath must not be nil — image attachment is mandatory.
-func NewThread(id, body string, filePath *FilePath, createdAt time.Time) (*Thread, error) {
+func NewThread(id, body string, filePath *image_file.FilePath, createdAt time.Time) (*Thread, error) {
 	if id == "" {
 		return nil, ErrThreadIDEmpty
 	}
@@ -45,7 +47,7 @@ func (t *Thread) Body() string {
 	return t.body
 }
 
-func (t *Thread) FilePath() *FilePath {
+func (t *Thread) FilePath() *image_file.FilePath {
 	return t.filePath
 }
 

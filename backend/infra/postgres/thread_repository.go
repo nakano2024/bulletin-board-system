@@ -8,6 +8,7 @@ import (
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
@@ -46,7 +47,7 @@ func (r *PostgresThreadRepository) FetchActiveThreadListNewestFirst(ctx context.
 			return nil, err
 		}
 
-		filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, fileName)
+		filePath, err := image_file.NewFilePath(r.baseThreadImagePath, fileName)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +86,7 @@ func (r *PostgresThreadRepository) CreateThread(ctx context.Context, pendingThre
 		return nil, toFileConstraintError(err)
 	}
 
-	filePath, err := domainthread.NewFilePath(r.baseThreadImagePath, fileName)
+	filePath, err := image_file.NewFilePath(r.baseThreadImagePath, fileName)
 	if err != nil {
 		return nil, err
 	}

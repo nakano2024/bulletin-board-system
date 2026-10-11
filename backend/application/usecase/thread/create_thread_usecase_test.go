@@ -12,6 +12,7 @@ import (
 
 	"github.com/nakanokota/bulletin-board-system/backend/application/mock/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 	domainuser "github.com/nakanokota/bulletin-board-system/backend/domain/user"
 	"github.com/nakanokota/bulletin-board-system/backend/domain/user/mock_user"
@@ -530,9 +531,9 @@ func TestCreateThreadUsecase_Exec_トランザクション_コミット失敗_�
 	}
 }
 
-func mustFilePath(t *testing.T) *domainthread.FilePath {
+func mustFilePath(t *testing.T) *image_file.FilePath {
 	t.Helper()
-	fp, err := domainthread.NewFilePath("thread_images/", "sample.png")
+	fp, err := image_file.NewFilePath("thread_images/", "sample.png")
 	require.NoError(t, err)
 	return fp
 }

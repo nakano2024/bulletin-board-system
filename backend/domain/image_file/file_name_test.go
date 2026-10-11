@@ -1,4 +1,4 @@
-package thread_test
+package image_file_test
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 )
 
 func TestNewFileName_正常系(t *testing.T) {
@@ -89,7 +89,7 @@ func TestNewFileName_正常系(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := thread.NewFileName(tt.fileName)
+			got, err := image_file.NewFileName(tt.fileName)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantValue, got.Value())
@@ -106,28 +106,28 @@ func TestNewFileName_異常系(t *testing.T) {
 		{
 			name:     "fileNameが空文字のとき、ErrFileNameInvalidが返ること",
 			fileName: "",
-			wantErr:  thread.ErrFileNameInvalid,
+			wantErr:  image_file.ErrFileNameInvalid,
 		},
 		{
 			name:     "fileNameに拡張子がないとき、ErrFileNameInvalidが返ること",
 			fileName: "sample",
-			wantErr:  thread.ErrFileNameInvalid,
+			wantErr:  image_file.ErrFileNameInvalid,
 		},
 		{
 			name:     "fileNameの拡張子が許可された画像形式でないとき、ErrFileNameInvalidが返ること",
 			fileName: "sample.txt",
-			wantErr:  thread.ErrFileNameInvalid,
+			wantErr:  image_file.ErrFileNameInvalid,
 		},
 		{
 			name:     "ファイル名部分に半角英数字・アンダースコア・ハイフン以外の文字が含まれるとき、ErrFileNameInvalidが返ること",
 			fileName: "sample@1.png",
-			wantErr:  thread.ErrFileNameInvalid,
+			wantErr:  image_file.ErrFileNameInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := thread.NewFileName(tt.fileName)
+			_, err := image_file.NewFileName(tt.fileName)
 
 			require.ErrorIs(t, err, tt.wantErr)
 		})

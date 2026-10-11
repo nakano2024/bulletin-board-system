@@ -8,16 +8,23 @@ services:
     volumes:
       - .:/app
     environment:
+      APP_ENV: local
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/bulletin_board?sslmode=disable
-      THREAD_IMAGE_BASE_PATH: thread_images/
+      THREAD_IMAGE_BASE_PATH: http://localhost:9000/images/
       REDIS_ADDR: redis:6379
-      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_ENDPOINT: http://localhost:9000
       RUSTFS_ACCESS_KEY: rustfsadmin
       RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_BUCKET: images
     depends_on:
-      - postgres
-      - redis
-      - rustfs
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      rustfs:
+        condition: service_started
+      rustfs-init:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:16-alpine
@@ -52,6 +59,32 @@ services:
       RUSTFS_SECRET_KEY: rustfsadmin
     volumes:
       - rustfs_data:/data
+
+  # rustfs-init creates the bucket the backend uploads into and makes it public-read (this is a
+  # public, unauthenticated bulletin board: every posted image is meant to be viewable by anyone;
+  # writes still require the app's presigned PUT signature). It runs once and exits; backend waits
+  # for it to finish successfully before starting. Retries head-bucket/create-bucket until RustFS
+  # is ready and the bucket exists, then (re)applies the read policy, so it's safe to re-run on
+  # every `docker compose up`.
+  rustfs-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - rustfs
+    environment:
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
+      AWS_DEFAULT_REGION: us-east-1
+      RUSTFS_ENDPOINT: http://rustfs:9000
+      RUSTFS_BUCKET: images
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        until aws --endpoint-url "$$RUSTFS_ENDPOINT" s3api head-bucket --bucket "$$RUSTFS_BUCKET" 2>/dev/null; do
+          aws --endpoint-url "$$RUSTFS_ENDPOINT" s3api create-bucket --bucket "$$RUSTFS_BUCKET" 2>/dev/null;
+          sleep 1;
+        done &&
+        echo "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":\"s3:GetObject\",\"Resource\":\"arn:aws:s3:::$$RUSTFS_BUCKET/*\"}]}" > /tmp/policy.json &&
+        aws --endpoint-url "$$RUSTFS_ENDPOINT" s3api put-bucket-policy --bucket "$$RUSTFS_BUCKET" --policy file:///tmp/policy.json
 
 volumes:
   postgres_data:

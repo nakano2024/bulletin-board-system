@@ -7,19 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
 	"github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 )
 
 func TestNewThread_正常系(t *testing.T) {
 	fixedTime := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
-	filePath, err := thread.NewFilePath("images/", "sample.png")
+	filePath, err := image_file.NewFilePath("images/", "sample.png")
 	require.NoError(t, err)
 
 	tests := []struct {
 		name              string
 		id                string
 		body              string
-		filePath          *thread.FilePath
+		filePath          *image_file.FilePath
 		createdAt         time.Time
 		wantFilePathValue string
 	}{
