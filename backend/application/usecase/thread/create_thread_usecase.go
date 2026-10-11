@@ -52,11 +52,9 @@ func (u *CreateThreadUsecase) Exec(ctx context.Context, cmd CreateThreadCommand)
 	}
 
 	var createdThread *domainthread.Thread
-	fnSucceeded := false
 	err = u.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		poster, err := u.userService.FetchOrCreate(txCtx, cmd.IP, date)
 		if err != nil {
-			u.logger.Error(ctx, err)
 			return err
 		}
 
@@ -66,23 +64,22 @@ func (u *CreateThreadUsecase) Exec(ctx context.Context, cmd CreateThreadCommand)
 		}
 
 		createdThread, err = u.threadCreationService.Create(txCtx, pendingThread)
-		if err != nil {
-			u.logger.Error(ctx, err)
-			return err
-		}
-
-		fnSucceeded = true
-		return nil
+		return err
 	})
 	if err != nil {
-		// Errors from inside fn were already logged there; only a failure of the transaction itself (e.g. commit) is new.
-		if fnSucceeded {
+		// PendingThread's own validation errors are user-caused input rejections, not a dependency
+		// failure, so they are not logged here; everything else (service/repository/commit errors) is.
+		if !isPendingThreadValidationError(err) {
 			u.logger.Error(ctx, err)
 		}
 		return nil, toCreateThreadError(err)
 	}
 
 	return &CreateThreadOutput{ThreadID: createdThread.ID()}, nil
+}
+
+func isPendingThreadValidationError(err error) bool {
+	return errors.Is(err, domainthread.ErrPendingThreadBodyEmpty) || errors.Is(err, domainthread.ErrPendingThreadFileIDEmpty)
 }
 
 // toCreateThreadError wraps the domain's sentinel errors in this package's errors so callers can classify them

@@ -28,6 +28,18 @@ func TestNewFilePath_正常系(t *testing.T) {
 			fileName:  "sample.png",
 			wantValue: "a/sample.png",
 		},
+		{
+			name:      "basePathがhttp URL(ホスト+パス)のとき、Value()が結合された文字列であること",
+			basePath:  "http://localhost:9000/images/",
+			fileName:  "sample.png",
+			wantValue: "http://localhost:9000/images/sample.png",
+		},
+		{
+			name:      "basePathがhttps URL(ポートなし)のとき、Value()が結合された文字列であること",
+			basePath:  "https://cdn.example.com/images/",
+			fileName:  "sample.png",
+			wantValue: "https://cdn.example.com/images/sample.png",
+		},
 	}
 
 	for _, tt := range tests {
@@ -68,6 +80,12 @@ func TestNewFilePath_異常系(t *testing.T) {
 		{
 			name:     "basePathに半角英数字・\"/\"以外の文字が含まれるとき、ErrFilePathBasePathInvalidが返ること",
 			basePath: "images-1/",
+			fileName: "sample.png",
+			wantErr:  image_file.ErrFilePathBasePathInvalid,
+		},
+		{
+			name:     "basePathがURL形式だが\"/\"で終わっていないとき、ErrFilePathBasePathInvalidが返ること",
+			basePath: "http://localhost:9000/images",
 			fileName: "sample.png",
 			wantErr:  image_file.ErrFilePathBasePathInvalid,
 		},
