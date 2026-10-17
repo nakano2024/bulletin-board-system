@@ -44,9 +44,11 @@ func main() {
 
 	listThreadsUsecase := applicationthread.NewListThreadsUsecase(threadRepository, logger)
 	createThreadUsecase := applicationthread.NewCreateThreadUsecase(threadCreationService, userService, timeGetter, txManager, logger)
+	getThreadUsecase := applicationthread.NewGetThreadUsecase(threadRepository, logger)
 	uploadImageFileUsecase := applicationimagefile.NewUploadImageFileUsecase(imageFileRepository, uuidGenerator, signedURLIssuer, logger)
 	listThreadsHandler := thread.NewListThreadsHandler(listThreadsUsecase)
 	createThreadHandler := thread.NewCreateThreadHandler(createThreadUsecase)
+	getThreadHandler := thread.NewGetThreadHandler(getThreadUsecase)
 	uploadImageFileHandler := image_file.NewUploadImageFileHandler(uploadImageFileUsecase)
 
 	e := echo.New()
@@ -59,6 +61,7 @@ func main() {
 	})
 	e.GET("/threads", listThreadsHandler.ListThreads)
 	e.POST("/threads", createThreadHandler.CreateThread)
+	e.GET("/threads/:id", getThreadHandler.GetThread)
 	e.POST("/files", uploadImageFileHandler.UploadImageFile)
 
 	e.Logger.Fatal(e.Start(":8080"))

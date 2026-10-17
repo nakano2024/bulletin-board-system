@@ -248,3 +248,41 @@ func TestPostgresThreadRepository_FetchActiveThreadListNewestFirst_ctxのトラ�
 		})
 	}
 }
+
+func TestPostgresThreadRepository_FetchThreadDetail_ctxのトランザクション(t *testing.T) {
+	pool := newTestPool(t)
+	fixedTime := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name        string
+		seedFiles   []seedFile
+		seedThreads []seedThread
+		id          string
+		want        *domainthread.ThreadDetail
+	}{
+		{
+			name:        "RunInTxのfnに渡されたctxで呼んだとき、そのトランザクション内でだけ投入したスレッドが取得できること",
+			seedFiles:   []seedFile{{id: "file-tx", name: "sample.png"}},
+			seedThreads: []seedThread{{id: "thread-tx", body: "hello", fileID: "file-tx", isAlive: true, createdAt: fixedTime}},
+			id:          "thread-tx",
+			want:        mustNewThreadDetail(t, "thread-tx", "hello", "sample.png", fixedTime, true, []*domainthread.Reply{}),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testTx := beginTx(t, pool)
+			seedFilesAndThreads(t, testTx, tt.seedFiles, tt.seedThreads)
+
+			sut := postgres.NewPostgresThreadRepository(pool, "thread_images/")
+			var got *domainthread.ThreadDetail
+			var err error
+			runInTestTx(t, testTx, func(txCtx context.Context) {
+				got, err = sut.FetchThreadDetail(txCtx, tt.id)
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, normalizeThreadDetail(t, got))
+		})
+	}
+}

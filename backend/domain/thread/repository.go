@@ -17,6 +17,13 @@ type IThreadFetcher interface {
 	FetchActiveThreadListNewestFirst(ctx context.Context) (*ThreadList, error)
 }
 
+// IThreadDetailFetcher provides read access to a single thread for its detail page.
+type IThreadDetailFetcher interface {
+	// FetchThreadDetail returns the thread whether or not it has fallen off (dat落ち); deciding what a fallen-off thread means is ThreadDetail's job.
+	// It returns ErrThreadNotFound if no thread has id.
+	FetchThreadDetail(ctx context.Context, id string) (*ThreadDetail, error)
+}
+
 // IPendingThreadRepository persists a PendingThread, turning it into a full Thread.
 type IPendingThreadRepository interface {
 	// CreateThread assigns a new id and creation time (infra-internal concerns) and persists pendingThread.
