@@ -13,4 +13,8 @@ var (
 	ErrFileNotFound = errors.New("thread file is not found")
 	// ErrFileAlreadyUsed means the given image file is already attached to another thread.
 	ErrFileAlreadyUsed = errors.New("thread file is already used")
+	// ErrThreadNotFound means no thread has the requested id.
+	ErrThreadNotFound = errors.New("thread is not found")
+	// ErrThreadDead means the requested thread has fallen off (dat落ち).
+	ErrThreadDead = errors.New("thread is dead")
 )

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	trmpgx "github.com/avito-tech/go-transaction-manager/drivers/pgxv5/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nakanokota/bulletin-board-system/backend/domain/image_file"
@@ -110,4 +111,87 @@ func toFileConstraintError(err error) error {
 	default:
 		return err
 	}
+}
+
+// FetchThreadDetail returns the thread whether or not it is alive, with its replies newest first
+// (an empty slice when it has none). It returns ErrThreadNotFound if no thread has id.
+func (r *PostgresThreadRepository) FetchThreadDetail(ctx context.Context, id string) (*domainthread.ThreadDetail, error) {
+	db := trmpgx.DefaultCtxGetter.DefaultTrOrDB(ctx, r.db)
+
+	var userID, body, fileName string
+	var isAlive bool
+	var createdAt time.Time
+	err := db.QueryRow(ctx, `
+		SELECT t.user_id, t.body, f.name, t.is_alive, t.created_at
+		FROM threads t
+		JOIN files f ON f.id = t.file_id
+		WHERE t.id = $1`, id,
+	).Scan(&userID, &body, &fileName, &isAlive, &createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errors.Join(domainthread.ErrThreadNotFound, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	filePath, err := image_file.NewFilePath(r.baseThreadImagePath, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	replies, err := r.fetchRepliesNewestFirst(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainthread.NewThreadDetail(id, userID, body, filePath, createdAt, isAlive, replies)
+}
+
+// fetchRepliesNewestFirst returns threadID's replies ordered by created_at, then id, both descending, so the order is stable.
+func (r *PostgresThreadRepository) fetchRepliesNewestFirst(ctx context.Context, threadID string) ([]*domainthread.Reply, error) {
+	rows, err := trmpgx.DefaultCtxGetter.DefaultTrOrDB(ctx, r.db).Query(ctx, `
+		SELECT rp.id, rp.user_id, rp.body, f.name, rp.created_at
+		FROM replies rp
+		LEFT JOIN files f ON f.id = rp.file_id
+		WHERE rp.thread_id = $1
+		ORDER BY rp.created_at DESC, rp.id DESC`, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	replies := make([]*domainthread.Reply, 0)
+	for rows.Next() {
+		var id, userID, body string
+		var fileName *string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &userID, &body, &fileName, &createdAt); err != nil {
+			return nil, err
+		}
+
+		filePath, err := r.toOptionalFilePath(fileName)
+		if err != nil {
+			return nil, err
+		}
+
+		reply, err := domainthread.NewReply(id, userID, body, filePath, createdAt)
+		if err != nil {
+			return nil, err
+		}
+
+		replies = append(replies, reply)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return replies, nil
+}
+
+// toOptionalFilePath converts a nullable files.name (NULL for a reply without an image) into a FilePath, or nil.
+func (r *PostgresThreadRepository) toOptionalFilePath(fileName *string) (*image_file.FilePath, error) {
+	if fileName == nil {
+		return nil, nil
+	}
+	return image_file.NewFilePath(r.baseThreadImagePath, *fileName)
 }

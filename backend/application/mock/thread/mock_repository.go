@@ -56,6 +56,45 @@ func (mr *MockIThreadFetcherMockRecorder) FetchActiveThreadListNewestFirst(ctx a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchActiveThreadListNewestFirst", reflect.TypeOf((*MockIThreadFetcher)(nil).FetchActiveThreadListNewestFirst), ctx)
 }
 
+// MockIThreadDetailFetcher is a mock of IThreadDetailFetcher interface.
+type MockIThreadDetailFetcher struct {
+	ctrl     *gomock.Controller
+	recorder *MockIThreadDetailFetcherMockRecorder
+	isgomock struct{}
+}
+
+// MockIThreadDetailFetcherMockRecorder is the mock recorder for MockIThreadDetailFetcher.
+type MockIThreadDetailFetcherMockRecorder struct {
+	mock *MockIThreadDetailFetcher
+}
+
+// NewMockIThreadDetailFetcher creates a new mock instance.
+func NewMockIThreadDetailFetcher(ctrl *gomock.Controller) *MockIThreadDetailFetcher {
+	mock := &MockIThreadDetailFetcher{ctrl: ctrl}
+	mock.recorder = &MockIThreadDetailFetcherMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIThreadDetailFetcher) EXPECT() *MockIThreadDetailFetcherMockRecorder {
+	return m.recorder
+}
+
+// FetchThreadDetail mocks base method.
+func (m *MockIThreadDetailFetcher) FetchThreadDetail(ctx context.Context, id string) (*thread.ThreadDetail, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FetchThreadDetail", ctx, id)
+	ret0, _ := ret[0].(*thread.ThreadDetail)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FetchThreadDetail indicates an expected call of FetchThreadDetail.
+func (mr *MockIThreadDetailFetcherMockRecorder) FetchThreadDetail(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchThreadDetail", reflect.TypeOf((*MockIThreadDetailFetcher)(nil).FetchThreadDetail), ctx, id)
+}
+
 // MockIPendingThreadRepository is a mock of IPendingThreadRepository interface.
 type MockIPendingThreadRepository struct {
 	ctrl     *gomock.Controller
