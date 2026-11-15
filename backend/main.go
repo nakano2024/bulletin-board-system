@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -55,6 +57,7 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Validator = handler.NewRequestValidator()
+	e.IPExtractor = newIPExtractor(ctx, logger)
 
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
@@ -65,6 +68,27 @@ func main() {
 	e.POST("/files", uploadImageFileHandler.UploadImageFile)
 
 	e.Logger.Fatal(e.Start(":8080"))
+}
+
+// newIPExtractor builds the IPExtractor from TRUSTED_PROXY_CIDRS (comma-separated CIDRs, e.g. the
+// BFF's network); unset means no proxy is trusted. An invalid entry is logged and stops startup.
+func newIPExtractor(ctx context.Context, logger *infralog.StdLogger) echo.IPExtractor {
+	trustedProxyCIDRsEnv := os.Getenv("TRUSTED_PROXY_CIDRS")
+	trustedProxyCIDRs := []string{}
+	if trustedProxyCIDRsEnv != "" {
+		rawTrustedProxyCIDRs := strings.Split(trustedProxyCIDRsEnv, ",")
+		for _, rawTrustedProxyCIDR := range rawTrustedProxyCIDRs {
+			trustedProxyCIDRs = append(trustedProxyCIDRs, strings.TrimSpace(rawTrustedProxyCIDR))
+		}
+	}
+
+	ipExtractor, err := handler.NewIPExtractor(trustedProxyCIDRs)
+	if err != nil {
+		err = fmt.Errorf("TRUSTED_PROXY_CIDRS is invalid: %w", err)
+		logger.Error(ctx, err)
+		panic(err)
+	}
+	return ipExtractor
 }
 
 // newSignedURLIssuer picks the ISignedURLIssuer implementation for the running environment:

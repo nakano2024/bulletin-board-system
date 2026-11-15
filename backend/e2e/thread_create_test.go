@@ -17,6 +17,7 @@ import (
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
 	domainthread "github.com/nakanokota/bulletin-board-system/backend/domain/thread"
 	domainuser "github.com/nakanokota/bulletin-board-system/backend/domain/user"
+	"github.com/nakanokota/bulletin-board-system/backend/handler"
 	handlerthread "github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/infra/clock"
 	infralog "github.com/nakanokota/bulletin-board-system/backend/infra/log"
@@ -71,6 +72,60 @@ func TestE2E_CreateThread_正常系(t *testing.T) {
 	err = pool.QueryRow(ctx, "SELECT ip FROM users WHERE id = $1", storedUserID).Scan(&storedIP)
 	require.NoError(t, err)
 	assert.Equal(t, ip, storedIP)
+}
+
+// TestE2E_CreateThread_正常系_XFF偽装 checks, through the real IPExtractor -> Handler -> Usecase -> UserService -> DB
+// stack, that a client outside the trusted proxy CIDRs can't change its user ID by spoofing X-Forwarded-For: two threads
+// posted from the same connection with different spoofed X-Forwarded-For values must be saved under the same user.
+func TestE2E_CreateThread_正常系_XFF偽装(t *testing.T) {
+	ctx := context.Background()
+	remoteIP := "203.0.113.60"
+	spoofedIPs := []string{"198.51.100.1", "198.51.100.2"}
+	fileIDs := []string{"file-e2e-xff-1", "file-e2e-xff-2"}
+
+	pool, err := pgxpool.New(ctx, os.Getenv("E2E_DATABASE_URL"))
+	require.NoError(t, err)
+	t.Cleanup(pool.Close)
+
+	for _, fileID := range fileIDs {
+		_, err = pool.Exec(ctx, "INSERT INTO files (id, name, content_type, size_bytes) VALUES ($1, $2, $3, $4)", fileID, fileID+".png", "image/png", 1024)
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM threads WHERE file_id = ANY($1)", fileIDs)
+		_, _ = pool.Exec(context.Background(), "DELETE FROM files WHERE id = ANY($1)", fileIDs)
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE ip = ANY($1)", append([]string{remoteIP}, spoofedIPs...))
+	})
+
+	createThreadHandler := newE2ECreateThreadHandler(pool)
+	ipExtractor, err := handler.NewIPExtractor([]string{"172.28.0.0/24"})
+	require.NoError(t, err)
+
+	e := echo.New()
+	e.IPExtractor = ipExtractor
+	storedUserIDs := []string{}
+	for i, spoofedIP := range spoofedIPs {
+		req := httptest.NewRequest(http.MethodPost, "/threads", strings.NewReader(`{"thread":{"body":"hello e2e","file_id":"`+fileIDs[i]+`"}}`))
+		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+		req.Header.Set(echo.HeaderXForwardedFor, spoofedIP)
+		req.RemoteAddr = remoteIP + ":12345"
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+
+		err = createThreadHandler.CreateThread(c)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var got handlerthread.CreateThreadResponse
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+
+		var storedUserID string
+		err = pool.QueryRow(ctx, "SELECT user_id FROM threads WHERE id = $1", got.Thread.ID).Scan(&storedUserID)
+		require.NoError(t, err)
+		storedUserIDs = append(storedUserIDs, storedUserID)
+	}
+
+	assert.Equal(t, storedUserIDs[0], storedUserIDs[1])
 }
 
 // TestE2E_CreateThread_異常系_ロールバック checks that the whole creation runs in one transaction: the poster's user row

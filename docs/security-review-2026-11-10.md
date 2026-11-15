@@ -6,7 +6,7 @@
 
 | # | 分類 | 概要 | 状態 |
 |---|---|---|---|
-| 1 | 重要 | `X-Forwarded-For` 偽装による他ユーザーIDのなりすまし | 未対応 |
+| 1 | 重要 | `X-Forwarded-For` 偽装による他ユーザーIDのなりすまし | 対応済み（BFF 側の XFF 付与は BFF 実装時に対応） |
 | 2 | 重要 | Content-Type 未検証・SVG 許可による Stored XSS | 未対応 |
 | 3 | 重要 | アップロードファイルサイズの上限なし | 未対応 |
 | 4 | 警告 | スレッド本文の1000文字制限なし・リクエストボディ上限なし | 未対応 |
@@ -28,6 +28,12 @@
 - 対策:
   - `e.IPExtractor = echo.ExtractIPFromXFFHeader(echo.TrustIPRange(<BFFのネットワーク>))` のように、BFF からのヘッダのみ信用する。
   - BFF 構成のため、BFF 側でも実クライアントIPを正しく `X-Forwarded-For` に付与して転送する必要がある。
+- 対応内容（2026-11-15）:
+  - `backend/handler/ip_extractor.go` に `NewIPExtractor()` を追加し、`backend/main.go` で `e.IPExtractor` に設定した。`main.go` は環境変数の読み込みと、不正な値のときのログ出力・起動停止だけを行う。
+  - 環境変数 `TRUSTED_PROXY_CIDRS`（カンマ区切りの CIDR）が未設定なら `RemoteAddr` のみを使い、`X-Forwarded-For` は無視する。
+  - 設定時は、直接の接続元がその CIDR 内のときだけ `X-Forwarded-For` を信用する。Echo の既定（ループバック・リンクローカル・プライベートIPを無条件に信用）は無効化した。
+  - テスト: `handler/ip_extractor_test.go`（抽出ルール）、`handler/thread/create_thread_handler_test.go`（Usecase に渡す IP）、`e2e/thread_create_test.go` の `TestE2E_CreateThread_正常系_XFF偽装`（偽装しても同一ユーザーになること）。
+  - 未対応: BFF 実装時に、BFF が実クライアントIPを `X-Forwarded-For` に付与し、BFF のネットワークを `TRUSTED_PROXY_CIDRS` に設定すること。
 
 ### 2. Content-Type 未検証・SVG 許可による Stored XSS
 
