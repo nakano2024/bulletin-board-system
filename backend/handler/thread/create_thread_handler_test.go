@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	applicationthread "github.com/nakanokota/bulletin-board-system/backend/application/usecase/thread"
+	"github.com/nakanokota/bulletin-board-system/backend/handler"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread"
 	"github.com/nakanokota/bulletin-board-system/backend/handler/thread/mock_thread"
 )
@@ -92,6 +93,63 @@ func TestCreateThreadHandler_CreateThread_Usecaseに渡す値(t *testing.T) {
 
 			sut := thread.NewCreateThreadHandler(usecase)
 			err := sut.CreateThread(c)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCreateThreadHandler_CreateThread_Usecaseに渡すIP(t *testing.T) {
+	tests := []struct {
+		name              string
+		trustedProxyCIDRs []string
+		remoteAddr        string
+		xForwardedFor     []string
+		setupMock         func(*mock_thread.MockcreateThreadUsecase)
+	}{
+		{
+			name:              "信用するCIDR外の接続元からX-Forwarded-Forに偽のIPを付けて送ったとき、接続元IPを持つCreateThreadCommandがUsecaseに渡されること",
+			trustedProxyCIDRs: []string{"172.28.0.0/24"},
+			remoteAddr:        "203.0.113.9:12345",
+			xForwardedFor:     []string{"198.51.100.1"},
+			setupMock: func(m *mock_thread.MockcreateThreadUsecase) {
+				m.EXPECT().Exec(gomock.Any(), applicationthread.CreateThreadCommand{
+					IP:     "203.0.113.9",
+					Body:   "hello",
+					FileID: "file-1",
+				}).Return(&applicationthread.CreateThreadOutput{ThreadID: "thread-1"}, nil)
+			},
+		},
+		{
+			name:              "信用するCIDR内の接続元(BFF)からX-Forwarded-For付きで送ったとき、X-Forwarded-ForのIPを持つCreateThreadCommandがUsecaseに渡されること",
+			trustedProxyCIDRs: []string{"172.28.0.0/24"},
+			remoteAddr:        "172.28.0.5:12345",
+			xForwardedFor:     []string{"198.51.100.1"},
+			setupMock: func(m *mock_thread.MockcreateThreadUsecase) {
+				m.EXPECT().Exec(gomock.Any(), applicationthread.CreateThreadCommand{
+					IP:     "198.51.100.1",
+					Body:   "hello",
+					FileID: "file-1",
+				}).Return(&applicationthread.CreateThreadOutput{ThreadID: "thread-1"}, nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			usecase := mock_thread.NewMockcreateThreadUsecase(ctrl)
+			tt.setupMock(usecase)
+			ipExtractor, err := handler.NewIPExtractor(tt.trustedProxyCIDRs)
+			require.NoError(t, err)
+			e := echo.New()
+			e.IPExtractor = ipExtractor
+			c, _ := newCreateThreadContext(e, validCreateThreadRequestBody)
+			c.Request().RemoteAddr = tt.remoteAddr
+			c.Request().Header[echo.HeaderXForwardedFor] = tt.xForwardedFor
+
+			sut := thread.NewCreateThreadHandler(usecase)
+			err = sut.CreateThread(c)
 
 			require.NoError(t, err)
 		})
